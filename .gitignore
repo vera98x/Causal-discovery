@@ -1,0 +1,14 @@
+/venv
+/venv1
+/Results*
+/Data
+.idea
+/__pycache__
+*.pub
+new_ssh
+*.png
+*.pyc
+/untitled_project
+/mlruns
+/Test*
+/NN_*
