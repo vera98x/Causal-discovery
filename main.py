@@ -10,9 +10,6 @@ import numpy as np
 import pandas as pd
 import math
 import time
-import itertools
-from enum import Enum
-import seaborn as sns
 
 
 def main_test():
@@ -39,38 +36,18 @@ def main_test():
 
     #sample_changer.NN_input_class_to_matrix("Test14_testsamples/nn_input.csv")
 
-def main(fix_dataframe : bool, calculate_background : bool, path, datasetname):
-    print("extracting file")
-    export_name = datasetname #"Data/Rtd-Ddr.csv" # 'Data/Rtd_2017-09-04_2017-12-08.csv' #'Data/2019-03-01_2019-05-31_original.csv' 'Data/Ut_2022-01-01_2022-12-10_2.csv' #'Data/6100_jan_nov_2022_2.csv'
-    #drp_mp_asn = ["Mp", "Bl", "Hgv", "Asn"]
-    #drp_rt = ["Ddr", "Grbr", "Zwd", "Kfhaz", "Brd", "Rlb", "Rtst", "Rtz", "Wiltz", "Rtb", "Wiltn", "Rtd"]
-    #drp_rt_restricted = ["Ddr", "Grbr", "Zwd", "Kfhaz", "Brd"]
-    #drp_rt_restricted_others = ["Rlb", "Rtst", "Rtz", "Wiltz", "Rtb", "Wiltn","Rtd"]
-    #drp_rt = ["Ddr", "Zwd", "Brd", "Rlb", "Rtz", "Rtb", "Rtd"]
-    #drp_asd = ["Asd", "Ods", "Dgrw", "Asdma", "Asdm", "Asa", "Dvd", "Asb"]
+def main(fix_dataframe : bool, calculate_background : bool, path, import_name):
+    print("Phase: dataframe cleaning and to TRO")
     # extract dataframe and impute missing values
-    if fix_dataframe:
-        df, sched = retrieveDataframe(export_name, True)
-        df.to_csv(path+"/df_done.csv", index=False, sep=";")
-        sched.to_csv(path+"/sched_done.csv", index=False, sep=";")
-    else:
-        df = pd.read_csv(path+"/df_done.csv", sep=";")
-        df['date'] = pd.to_datetime(df['date'], format='%Y-%m-%d').dt.date
-        df['basic_plan'] = pd.to_datetime(df['basic_plan'], format='%Y-%m-%d %H:%M:%S')
-        df['global_plan'] = pd.to_datetime(df['global_plan'], format='%H:%M:%S').dt.time
-
-        sched = pd.read_csv(path+"/sched_done.csv", sep=";")
-        sched['date'] = pd.to_datetime(sched['date'], format='%Y-%m-%d').dt.date
-        sched['basic_plan'] = pd.to_datetime(sched['basic_plan'], format='%Y-%m-%d %H:%M:%S')
-        sched['global_plan'] = pd.to_datetime(sched['global_plan'], format='%H:%M:%S').dt.time
-
+    df, sched = retrieveDataframe(import_name, True)
+    df.to_csv(path+"/df_done.csv", index=False, sep=";")
+    sched.to_csv(path+"/sched_done.csv", index=False, sep=";")
     print("done extracting", len(df))
     trn_sched_matrix = dfToTrainRides(sched)[0]
+    # create schedule of the Train ride nodes
     index_dict = createindexDict(trn_sched_matrix)
     # change the dataframe to trainRideNodes
     trn_matrix = dfToTrainRides(df, index_dict)
-
-    print("extracting file done")
 
     print("translating dataset to 2d array for algo")
     print("Amount of variables: ", len(trn_matrix[0]))
@@ -85,7 +62,7 @@ def main(fix_dataframe : bool, calculate_background : bool, path, datasetname):
         bk, cg_sched = dk.create_background_knowledge_wrapper()  # get_CG_and_background(smaller_dataset, 'Results/sched.png')
 
         fas_method = FAS_method('mv_fisherz', delays_to_feed_to_algo,
-                                path+'/6100_jan_nov_with_backg_FAS.png', trn_sched_matrix, column_names, bk)
+                                path+'/6100_jan_nov_with_backg_FAS.png', trn_sched_matrix, bk, column_names)
         gg = fas_method.fas_with_background(False)
         gg2txt(gg, path+"/6100_FAS.txt")
     else:

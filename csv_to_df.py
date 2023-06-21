@@ -29,27 +29,6 @@ def keepWeekendDays(df_input : pd.DataFrame) ->  pd.DataFrame:
     df_input = df_input.drop(columns=['daynumber'])
     return df_input
 
-def changeToD(df_complete : pd.DataFrame) ->  pd.DataFrame:
-    df_filter = df_complete[(df_complete["basic_drp_act"] == 'K_A') | (df_complete["basic_drp_act"] == 'A')
-                            | (df_complete["basic_drp_act"] == 'K_V') | (df_complete["basic_drp_act"] == 'V')]
-
-    # find the unique values of A or V: then Rs and Vs should be kept
-    unique = df_filter.drop_duplicates(subset=['basic_treinnr', 'basic_drp', 'date'], keep=False)
-
-    # change the activity of "vertrek" to "doorkomst"
-    df_complete["basic_drp_act"] = df_complete["basic_drp_act"].replace('K_V', 'D')
-    df_complete["basic_drp_act"] = df_complete["basic_drp_act"].replace('V', 'D')
-
-    #remove the A or K_A values
-    df_complete = df_complete[~(df_complete["basic_drp_act"] == 'K_A') & ~(df_complete["basic_drp_act"] == 'A')]
-
-    df_res = pd.concat([unique, df_complete]).drop_duplicates(subset=['basic_treinnr', 'basic_drp', 'date' ], keep='first')
-
-    df_res = df_res.sort_values(by=['date', 'basic_treinnr_treinserie', "basic_treinnr", "basic_plan"])
-
-    df_res = df_res.reset_index(drop=True)
-    return df_res
-
 def makeDataUniform(df : pd.DataFrame, sched : pd.DataFrame) ->  pd.DataFrame:
     gb = df.groupby(['date'])
     grouped_by_date = [gb.get_group(x) for x in gb.groups]
@@ -164,8 +143,6 @@ def removeFacultativeTrains(df, df_sched):
 
     return pd.concat([df_sched, df_remove, df_remove]).drop_duplicates(subset=['basic_treinnr', 'basic_drp', 'basic_drp_act'], keep=False).reset_index(drop=True)
 
-
-
 def retrieveDataframe(export_name : str, workdays : bool, list_of_trainseries: List[str] = None, list_of_drp: List[str] = None) -> Tuple[pd.DataFrame, pd.DataFrame]:
     # split dataframes in column
     df = pd.read_csv(export_name, sep=";")
@@ -186,25 +163,19 @@ def retrieveDataframe(export_name : str, workdays : bool, list_of_trainseries: L
     df['basic_uitvoer'] = pd.to_datetime(df['basic_uitvoer'], format='%Y-%m-%d %H:%M:%S')
     # use this column to determine if a train is cancelled
     df['vklvos_plan_actueel'] = pd.to_datetime(df['vklvos_plan_actueel'], format='%Y-%m-%d %H:%M:%S')
-    # rond het plan af op hele minuten
+    # round the global plan to whole minutes
     df["global_plan"] = df['basic_plan'].dt.floor('Min')
-    #print(df["global_plan"].to_string())
-    # df["global_plan"] = df.global_plan.apply(
-    #     lambda x: x - timedelta(minutes=x.minute % 5,
-    #                     seconds=x.second,
-    #                     microseconds=x.microsecond) if (not np.isnat(x)) else np.nan)
     df["global_plan"] = df["global_plan"].dt.time
     df['delay'] = df['basic_uitvoer'] - df['basic_plan']
     df['delay'] = df['delay'].map(toSeconds)
     # if there is no basic uitvoer or basic plan, give a small random delay such that not everything is 0 or nan
+    #todo: remove this approach
     df['delay'] = df['delay'].apply(lambda v: random.randint(-5, 5) if np.isnan(v) else v)
-    # if the basic_uitvoer is empty, fill it with the value of basic_plan
-    #df['basic_uitvoer'] = df['basic_uitvoer'].fillna(df['basic_plan'])
 
     # rename column
     df['date'] = df['nvgb_verkeersdatum']
     df["speed"] = df['prl_rijw_laatst_rijweg_wisselroute_maxsnelheid']
-    #todo replace this with real wissel data
+    # The wissels (switches) are not implemented, but for a future implementation, this is already present.
     df = df.assign(wissels = "MP$283$R,MP$281B$R,MP$281A$R,MP$271A$L,MP$269$L,MP$263A$R,MP$247$R,MP$243B$R,MP$241A$L")
     df["stipt_oorzaak_treinr"] = df["stipt_oorzaak_treinr"].astype('string')
     df["stipt_oorzaak_treinr"] = df["stipt_oorzaak_treinr"].fillna("")
@@ -212,7 +183,7 @@ def retrieveDataframe(export_name : str, workdays : bool, list_of_trainseries: L
     # remove duplicated actions within de dataset
     df = df.drop_duplicates(subset=['date','basic_treinnr', 'basic_drp', 'basic_drp_act'],
                                                    keep='first')
-
+    # only keep the desired trainseries or drps
     if list_of_trainseries != None:
         # only keep the desired train series
         df = keepTrainseries(df, list_of_trainseries)
@@ -220,9 +191,7 @@ def retrieveDataframe(export_name : str, workdays : bool, list_of_trainseries: L
         df = df[df['basic_drp'].isin(list_of_drp)]
     # add a buffer column
     df = addbufferColumn(df)
-    # Remove all arrival events, keep the departure events and call it 'D'
-    #df = changeToD(df)
-    # add a traveltime column (important to have after changeToD())
+    # add a traveltime column
     df = addTravelTimeColumn(df)
     df['donna_bd_kalerijtijd'] = df['donna_bd_kalerijtijd'].fillna(0)
     df["slack"] = df['traveltime'] - df['donna_bd_kalerijtijd']
@@ -239,20 +208,24 @@ def retrieveDataframe(export_name : str, workdays : bool, list_of_trainseries: L
     # first remove the cancelled trains (since they do have a planning, delete them before the schedule is found, such that always cancelled trains are not included)
     df = removeCancelledTrain(df)
 
-    # find the general schedule of the df
+    # add a new column called "same date" which is an boolean containing information about if the date is the same as the date in the basic plan
+    # if that is not the case, we know it is a night train.
     df["basic_plan_date"] = df.basic_plan.apply(lambda x: x.date())
     df["same_date"] = df["basic_plan_date"] == df["date"]
     df = df.drop(columns=["basic_plan_date"])
-
+    # find the general schedule of the df
     sched = findSched(df)
     # according to this schedule, impute or remove entries
     df = makeDataUniform(df, sched)
-
+    # after the schedule is created, the speed is ffilled over all the rows
+    # the speed denotes the speed limit that is required for that specific event
     df["speed"] = df["speed"].fillna(
         method="ffill")
     df["speed"] = df["speed"].replace(
         "?", np.nan)
+    # vklvos_bijzonderheid_drglsnelheid denotes the normal speed that is allowed.
     df["vklvos_bijzonderheid_drglsnelheid"] = df["vklvos_bijzonderheid_drglsnelheid"].fillna(method="ffill")
+    # where is denoted that the speed is "baanvak", this means that the normal speed should be applied, which is saved in the vklvos_bijzonderheid_drglsnelheid column
     df['speed'] = np.where(
         df['speed'] == "baanvak", df['vklvos_bijzonderheid_drglsnelheid'],
         df['speed'])
@@ -267,11 +240,10 @@ def findSched(df):
     df_sched = copy.deepcopy(df)
     df_sched = df_sched.sort_values(by=['date', 'basic_treinnr_treinserie', "basic_treinnr", "basic_plan"])
     df_sched = df_sched.reset_index(drop=True)
-    # TODO: only suitable for days with D
     # get the amount of days
     days_count = len(df_sched.groupby('date'))
     print(days_count)
-    # set treshold for amount of occurences
+    # set threshold for amount of occurences
     min_occ = math.ceil(days_count*0.35)
     g = df_sched.groupby(['basic_treinnr', 'basic_drp', 'basic_drp_act', "global_plan"])
     # only keep the events that occurs larger than the threshold
@@ -281,9 +253,7 @@ def findSched(df):
     # since we want to have a schedule for one day, we keep all occurences once (now all different dates are included).
     df_sched = df_sched.drop_duplicates(subset=['basic_treinnr', 'basic_drp', 'basic_drp_act'], keep='first').reset_index(drop=True)
     print("events per day: ", len(df_sched))
-    # since the trainnumber can have multiple actions at a station, we check if there are no duplicate actions
-    print("duplicated actions", len(df_sched[df_sched.duplicated(['basic_treinnr', 'basic_drp', 'basic_drp_act'], keep=False)]))
-    # add a old timestamp to it, to recognise the schedule entries
+    # add an old timestamp to it, to recognise the schedule entries
     timestamp = pd.to_datetime("01-01-2000", format='%d-%m-%Y')
 
     df_sched = df_sched.assign(date=timestamp)
@@ -291,23 +261,22 @@ def findSched(df):
     df_sched = df_sched.assign(time=df_sched["basic_plan"].dt.time)
     df_sched.loc[:, "basic_plan"] = pd.to_datetime(df_sched.date.astype(str) + ' ' + df_sched.time.astype(str))
 
-    #-------------------------------------------------------------------------------------------------- fix date jump in basic plan
+    #-------------------------------------------------------------------------------------------------- fix date jump in basic plan with the help of the "same date" column
     df_sched["basic_plan_tomorrow"] = df_sched["basic_plan"].apply(lambda x: x + dt.timedelta(days=1))
     df_sched['basic_plan'] = np.where(df_sched['same_date'] == True, df_sched['basic_plan'],df_sched['basic_plan_tomorrow'])
     df_sched = df_sched.drop(columns=["basic_plan_tomorrow"])
-    #df_sched["basic_plan"] = df_sched["basic_plan"].apply(lambda x: x + dt.timedelta(days=1) if x.hour <= 4 else x)
-    # -------------------------------------------------------------------------------------------------- fix date jump in basic plan done
+    # -------------------------------------------------------------------------------------------------- end fix date jump in basic plan done
     df_sched = df_sched.drop(columns=["time"])
-
-    df_sched["delay"] = 0
+    df_sched["delay"] = np.nan
     df_sched["speed"] = np.nan
     df_sched["nvgb_verkeersdatum"] = df_sched["date"]
     df_sched["stipt_oorzaak_treinr"] = ""
     df_sched= df_sched.sort_values(by=['basic_treinnr_treinserie', "basic_treinnr", "basic_plan"]).reset_index(drop=True)
     print(len(df_sched), "activities per day!")
     df_sched = removeFacultativeTrains(df, df_sched)
-    df_sched = df_sched.loc[~df_sched.basic_treinnr_treinserie.str.startswith('GO', na=False)] # TODO: you can also just remove where traintype is GO
+    # remove the freight trains and the trains that do not have a fixed schedule such as Losse loc
+    df_sched = df_sched.loc[~df_sched.basic_treinnr_treinserie.str.startswith('GO', na=False)]
     df_sched = df_sched.loc[~df_sched.basic_treinnr_treinserie.str.startswith('LL', na=False)]
     df_sched = df_sched.reset_index(drop=True)
-    print(len(df_sched), "activities per day, after removing the facultative trains!")
+    print(len(df_sched), "activities per day, after removing the facultative, freight and ll trains!")
     return df_sched
