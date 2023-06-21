@@ -76,7 +76,7 @@ class DomainKnowledge:
         return bk
 
     def addPossibleBasedStation(self, bk: FastBackgroundKnowledge) -> FastBackgroundKnowledge:
-        buffer = 10  # minutes
+        buffer = 15  # minutes
         for station, station_list in self.station_dict.items():
             # sort on planned time
             station_list.sort(key=lambda x: x[0])

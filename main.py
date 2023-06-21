@@ -4,8 +4,8 @@ from createBackgroundKnowledge import DomainKnowledge, Graph_type
 from causallearn.utils.TXT2GeneralGraph import txt2generalgraph
 from FAS import FAS_method
 from graph_to_nn_input import NN_samples
-from NeuralNetwork import preTrainedNN, precisionNN, testNN, test_precision
-from Utils import gg2txt
+from NeuralNetwork import preTrainedNN, precisionNN, testPretrainedNN, test_precision
+from Utils import gg2txt, traveltime_tester, saveGraph, print_number_freight
 import numpy as np
 import pandas as pd
 import math
@@ -216,17 +216,18 @@ def relativeError():
     print("Mean: ", np.mean(relative_error))
 
 
-def create_train_and_test(path):
-    df = pd.read_csv(path + '/nn_input.csv', sep=";")
+def create_train_and_test(path_input, path_output):
+    df = pd.read_csv(path_input + '/nn_input.csv', sep=";")
     df = df.dropna(subset=['delay'])
     df = df.dropna(subset=['prev_event'])
     df = df.dropna(subset=["traveltime"])
     # add index number
     df = df.reset_index()
-    train_set = df.sample(frac=0.8)
+    df.rename(columns={'index': 'index_total'}, inplace=True)
+    train_set = df.sample(frac=0.8, random_state=42)
     test_set = df.drop(train_set.index)
-    train_set.to_csv(path + "/nn_input_train.csv", index=False, sep=";")
-    test_set.to_csv(path + "/nn_input_test.csv", index=False, sep=";")
+    train_set.to_csv(path_output + "/nn_input_train.csv", index=False, sep=";")
+    test_set.to_csv(path_output + "/nn_input_test.csv", index=False, sep=";")
 
 def preprocess_df(df, weights, subset_with_only_interaction, dep_columns):
     # if the prev event or the delay is not known, remove it from the dataframe
@@ -237,11 +238,14 @@ def preprocess_df(df, weights, subset_with_only_interaction, dep_columns):
     print(len(df))
     if weights:
         # df["weigth"] = np.where(((df['prev_platform'] > 60) | (df['dep1'] > 60) | (df['dep2'] > 60) | (df['dep3'] > 60)) & (df['delay'] > 60), 1000, 1)
-        df["weight"] = np.where(~df["cause"].isna(), 50, 1)
+        df["delay_jump"] = abs(df["prev_event"] - df["delay"])
+        df["weight"] = np.where((df["delay_jump"] >= 30), df["delay_jump"]*1.5, 1)
+        #df["weight"] = np.where(~df["cause"].isna(), 50, 1)
+        df = df.drop(columns=["delay_jump"])
     else:
         df["weight"] = 1
     if subset_with_only_interaction:
-        df = df.dropna(subset=["dep1", "prev_platform"], how="all")
+        df = df.dropna(subset=["dep1", "dep0_platform"], how="all")
         df = df.dropna(subset=['cause'])
     print("After: ", len(df))
     df = df.fillna(-50)
@@ -253,15 +257,15 @@ def preprocess_df(df, weights, subset_with_only_interaction, dep_columns):
     df = df[df.columns.drop(list(df.filter(regex='trainmat_')))]
     return df
 
-def main_nn(train_pre_nn: bool, test_pre_trained_nn: bool, train_precision_nn: bool, test_precision_bool :bool, subset_with_only_interaction: bool, weights :bool, dep_columns : bool, path, experiment_name1 ='default', experiment_name2 ='default'):
+def main_nn(train_pre_nn: bool, test_pre_trained_nn: bool, train_precision_nn: bool, test_precision_bool :bool, subset_with_only_interaction: bool, weights :bool, dep_columns : bool, path, experiment_name1 ='default', experiment_name2 ='default', temp = ""):
     df_train = pd.read_csv(path+'/nn_input_train.csv', sep = ";")
     df_test = pd.read_csv(path + '/nn_input_test.csv', sep=";")
     print("train: ", len(df_train), "test: ", len(df_test))
     df_train = preprocess_df(df_train, weights, subset_with_only_interaction, dep_columns)
-    df_test = preprocess_df(df_train, weights, subset_with_only_interaction, dep_columns)
+    df_test = preprocess_df(df_test, weights, subset_with_only_interaction, dep_columns)
 
-    remaining_df_train = df_train[df_train.columns[~df_train.columns.isin(["id", 'delay', "trainserie", "drp", "act", "weight", "cause", "index"])]]
-    remaining_df_test= df_test[df_test.columns[~df_test.columns.isin(["id", 'delay', "trainserie", "drp", "act", "weight", "cause", "index"])]]
+    remaining_df_train = df_train[df_train.columns[~df_train.columns.isin(["id", 'delay', "trainserie", "drp", "act", "weight", "cause", "index_total"])]]
+    remaining_df_test= df_test[df_test.columns[~df_test.columns.isin(["id", 'delay', "trainserie", "drp", "act", "weight", "cause", "index_total"])]]
 
 
     print(remaining_df_train.columns)
@@ -275,14 +279,15 @@ def main_nn(train_pre_nn: bool, test_pre_trained_nn: bool, train_precision_nn: b
         df_train["act"] = "not_included"
         df_test["act"] = "not_included"
     act_train,  act_test= df_train.act.values, df_test.act.values
+    index_train, index_test = df_train.index_total.values, df_test.index_total.values
     # first use the general nn to train
     if train_pre_nn:
-        preTrainedNN((x_train,x_test), (y_train, y_test),(w_train,w_test), (trainserie_train,trainserie_test), (drp_train,drp_test), (prev_train,prev_test), (act_train,act_test), path, str(remaining_df_train.columns), experiment_name1)
+        preTrainedNN((x_train,x_test), (y_train, y_test),(w_train,w_test), (trainserie_train,trainserie_test), (drp_train,drp_test), (prev_train,prev_test), (act_train,act_test), (index_train, index_test), path, str(remaining_df_train.columns), experiment_name1)
     if test_pre_trained_nn:
 
-        total_df = testNN(x_test, y_test, w_test, trainserie_test, drp_test, prev_test, act_test, path + "/Models",
-                                          str(remaining_df_test.columns),
-                                          experiment_name2)
+        total_df = testPretrainedNN(x_test, y_test, w_test, trainserie_test, drp_test, prev_test, act_test, index_test, path + "/Models",
+                                    str(remaining_df_test.columns),
+                                    experiment_name2)
         total_df.to_csv(path + "/tested_pre_trained_merged_files.csv", index=False, sep=";")
     if train_precision_nn:
         # then use a second NN for more precision
@@ -292,19 +297,15 @@ def main_nn(train_pre_nn: bool, test_pre_trained_nn: bool, train_precision_nn: b
             y_train = group["delay"].tolist()
             w_train = [1] * len(group["delay"].tolist())
             # add all columns except id and delay as input
-            to_include_x = group[group.columns[~group.columns.isin(["id", 'delay', "trainserie", "drp", "act", "weight", "cause", "index"])]]
+            to_include_x = group[group.columns[~group.columns.isin(["id", 'delay', "trainserie", "drp", "act", "weight", "cause", "index_total"])]]
             x_train = to_include_x.values.tolist()
             trainserie_train = group.trainserie.values
             drp_train = group.drp.values
             prev_train = group.prev_event.values
             act_train = group.act.values
-            if(index == 0):
-                total_df = precisionNN(x_train,y_train,w_train,trainserie_train, drp_train, prev_train, act_train, path+"/Models", str(remaining_df_train.columns), experiment_name2)
-            else:
-                new_df = precisionNN(x_train,y_train,w_train,trainserie_train, drp_train, prev_train, act_train, path+"/Models", str(remaining_df_train.columns), experiment_name2)
-                total_df = pd.concat([total_df, new_df])
+            precisionNN(x_train,y_train,w_train,trainserie_train, drp_train, prev_train, act_train, path+"/Models", str(remaining_df_train.columns), experiment_name2)
 
-        total_df.to_csv(path + "/merged_files.csv", index=False, sep=";")
+        #total_df.to_csv(path + "/merged_files.csv", index=False, sep=";")
 
     if test_precision_bool:
         # then use a second NN for more precision
@@ -314,38 +315,23 @@ def main_nn(train_pre_nn: bool, test_pre_trained_nn: bool, train_precision_nn: b
             y_test = group["delay"].tolist()
             w_test = [1] * len(group["delay"].tolist())
             # add all columns except id and delay as input
-            to_include_x = group[group.columns[~group.columns.isin(["id", 'delay', "trainserie", "drp", "act", "weight", "cause", "index"])]]
+            to_include_x = group[group.columns[~group.columns.isin(["id", 'delay', "trainserie", "drp", "act", "weight", "cause", "index_total"])]]
             x_test = to_include_x.values.tolist()
             trainserie_test = group.trainserie.values
             drp_test = group.drp.values
             prev_test = group.prev_event.values
             act_test = group.act.values
+            index_test = group.index_total.values
             if (index == 0):
-                total_df = test_precision(x_test, y_test, w_test, trainserie_test, drp_test, prev_test, act_test, path + "/Models", str(remaining_df_test.columns),
+                total_df = test_precision(x_test, y_test, w_test, trainserie_test, drp_test, prev_test, act_test, index_test, path + "/Models", str(remaining_df_test.columns),
                                        experiment_name2)
             else:
-                new_df = test_precision(x_test, y_test, w_test, trainserie_test, drp_test, prev_test, act_test, path + "/Models", str(remaining_df_test.columns),
+                new_df = test_precision(x_test, y_test, w_test, trainserie_test, drp_test, prev_test, act_test, index_test, path + "/Models", str(remaining_df_test.columns),
                                      experiment_name2)
                 total_df = pd.concat([total_df, new_df])
-        total_df.to_csv(path + "/tested_merged_files.csv", index=False, sep=";")
-class Names(Enum):
-    rtd_station_testing = "rtd_station_testing"
-    rtd_complete = "rtd_complete"
-    rtd_complete_precision = "rtd_complete_precision"
-    rtd_station = "rtd_station"
-    rtd_station_precicion = "rtd_station_precicion"
-    asd_station_testing = "asd_station_testing"
-    asd_complete = "asd_complete"
-    asd_complete_precision = "asd_complete_precision"
-    asd_station = "asd_station"
-    asd_station_precicion = "asd_station_precicion"
+        total_df.to_csv(path + "/tested_merged_files_" + temp + ".csv", index=False, sep=";")
 
-
-#main_test()
-#traveltime_tester("Test24_complete_asd")
-main(fix_dataframe= True, calculate_background = False, path="Test38_asd", datasetname = "Data/Asd-Ut.csv" )
-#correlations(path="Test25_rtd/Long_delays")
-main_nn(train_pre_nn= True, test_pre_trained_nn= False, train_precision_nn=True, test_precision_bool = False, subset_with_only_interaction= False, weights= False, dep_columns= True, path="Test38_asd", experiment_name1="asd_dep_columns_new_orientations", experiment_name2="asd_testing_precision_dep_columns_rows_only_deps")
-#accuracy_per_group("Test24_complete_asd/nn_output_12.5_2023_04_24_08_22_10.csv", ["drp"], False)
-#accuracy_per_group(filename="Test30_deps_na/nn_results/total_test/nn_output_9.43_2023_05_10_13_31_45.csv", destination_path = "Test30_deps_na/nn_results/total_test/", list_to_group_on = ["bucket"], bucket=True)
-#["drp"]
+# main(fix_dataframe= True, calculate_background = True, path="Test50_asd", datasetname = "Data/Asd-Ut.csv" )
+# create_train_and_test(path_input="Test50_asd", path_output="Test50_asd")
+# main_nn(train_pre_nn= True, test_pre_trained_nn= False, train_precision_nn=True, test_precision_bool = True, subset_with_only_interaction= False, weights= False, dep_columns= True,
+#        path="Test50_asd", experiment_name1="Ehv_dep_train_buffer_15_min", experiment_name2="Asd_dep_test_buffer_15_min", temp="column_causes")

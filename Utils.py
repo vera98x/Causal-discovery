@@ -9,6 +9,7 @@ from typing import Dict
 from TrainRideNode import TrainRideNode
 import math
 import pandas as pd
+from causallearn.utils.GraphUtils import GraphUtils
 
 def gg2txt(gg : GeneralGraph, filename : str) -> None:
     nodes = gg.get_nodes()
@@ -189,6 +190,11 @@ def traveltime_tester(path):
                 except:
                     print(curr, "and" , prev, "are not present in the dict")
 
+def saveGraph(inputfile, destination):
+    gg = txt2generalgraph(inputfile)
+    pdy = GraphUtils.to_pydot(gg)
+    pdy.write_png(destination)
+
 def comparingInteraction(path):
     df_dict = {}
     gg_dict = {}
@@ -226,3 +232,10 @@ def comparingInteraction(path):
         not_overlapping = list(set(value) ^ set(overlapping))
         df.append([key, overlapping, not_overlapping], ignore_index=True)
     df.to_csv("df_overlap.csv", index=False, sep=";")
+
+def print_number_freight(filename):
+    df = pd.read_csv(filename, sep=";")
+    print(len(df))
+    df_freight = df.loc[df['basic_treinnr_rijkarakter'] == "GO"]
+    print(len(df_freight))
+    print("Percentage: ", 100/len(df)*len(df_freight))

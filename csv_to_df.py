@@ -162,7 +162,7 @@ def removeFacultativeTrains(df, df_sched):
     df_remove = g.filter(lambda x: len(x) > min_occ).reset_index(drop=True)
     df_remove = df_remove.drop_duplicates(subset=['basic_treinnr', 'basic_drp', 'basic_drp_act'], keep='first')
 
-    return pd.concat([df_sched, df_remove]).drop_duplicates(subset=['basic_treinnr', 'basic_drp', 'basic_drp_act'], keep=False).reset_index(drop=True)
+    return pd.concat([df_sched, df_remove, df_remove]).drop_duplicates(subset=['basic_treinnr', 'basic_drp', 'basic_drp_act'], keep=False).reset_index(drop=True)
 
 
 

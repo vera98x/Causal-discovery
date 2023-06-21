@@ -32,9 +32,9 @@ def variance_laplace(y_true, y_pred, weights):
 def weights_mae(y_true, y_pred, weights):
     return abs(y_pred - y_true) * weights
 
-def preTrainedNN(x_raw : Tuple[List[List[float]], List[List[float]]], y_raw : Tuple[List[float], List[float]], w_raw : Tuple[List[float], List[float]], trainserie : Tuple[List[str], List[str]], drp : Tuple[List[str], List[str]], prev : Tuple[List[str], List[str]], act :Tuple[List[str], List[str]], path : str, df_columns, experiment_name):
+def preTrainedNN(x_raw : Tuple[List[List[float]], List[List[float]]], y_raw : Tuple[List[float], List[float]], w_raw : Tuple[List[float], List[float]], trainserie : Tuple[List[str], List[str]], drp : Tuple[List[str], List[str]], prev : Tuple[List[str], List[str]], act :Tuple[List[str], List[str]], index: Tuple[List[int], List[int]], path : str, df_columns, experiment_name):
     mlflow.set_experiment(experiment_name)
-    input_dim = len(x_raw[0])
+    input_dim = len(x_raw[0][0])
     # x_train_raw, x_test_raw, y_train_raw, y_test_raw, w_train_raw, w_test_raw, trainserie_train, trainserie_test, drp_train, drp_test, prev_train, prev_test, \
     #     act_train, act_test = train_test_split(x_raw, y_raw, weight, trainserie, drp, prev, act, test_size=0.20, random_state=42)
     x_train = tf.constant(x_raw[0])
@@ -44,13 +44,6 @@ def preTrainedNN(x_raw : Tuple[List[List[float]], List[List[float]]], y_raw : Tu
     y_test = tf.constant(y_raw[1])
     w_test = tf.constant(w_raw[1])
 
-    print(x_train.shape, y_train.shape)
-    inp = tf.keras.layers.Input(shape=(input_dim,))
-    true = tf.keras.layers.Input((1,))
-    weights = tf.keras.layers.Input((1,))
-    h1 = tf.keras.layers.Dense(256, activation="ReLU", kernel_initializer="RandomUniform")(inp)
-    out = tf.keras.layers.Dense(1, activation="PReLU", kernel_initializer= tf.keras.initializers.GlorotNormal(seed = 42) )(h1)
-
     def rmse_():
         return tf.sqrt(tf.reduce_mean((out - true)**2))
 
@@ -59,6 +52,13 @@ def preTrainedNN(x_raw : Tuple[List[List[float]], List[List[float]]], y_raw : Tu
 
     def mae_():
         return abs(out - true)
+
+    print(x_train.shape, y_train.shape)
+    inp = tf.keras.layers.Input(shape=(input_dim,))
+    true = tf.keras.layers.Input((1,))
+    weights = tf.keras.layers.Input((1,))
+    h1 = tf.keras.layers.Dense(256, activation="ReLU", kernel_initializer="RandomUniform")(inp)
+    out = tf.keras.layers.Dense(1, activation="PReLU", kernel_initializer= tf.keras.initializers.GlorotNormal(seed = 42) )(h1)
 
     model = tf.keras.Model([inp, true, weights], out)
     model.add_loss(weights_mae(true, out, weights))
@@ -89,7 +89,7 @@ def preTrainedNN(x_raw : Tuple[List[List[float]], List[List[float]]], y_raw : Tu
     filename1 = path + "/nn_output" + "_" + str(
         round(mae, 2)) + "_" + str(datetime.today().strftime('%Y_%m_%d_%H_%M_%S'))
 
-    showMetrixes(prediction, y_test, trainserie[1], drp[1], prev[1], act[1], filename1, df_columns, True)
+    showMetrixes(prediction, y_test, trainserie[1], drp[1], prev[1], act[1], filename1, df_columns, True, index[1])
     #model.save_weights(path + '/firstModelWeights')
     model.save(path+'/Models/firstModel')
 
@@ -134,7 +134,7 @@ def precisionNN(x_train_raw : List[List[float]], y_train_raw : List[float], w_tr
     savedModel.save(filename1)
     # return showMetrixes(prediction, y_test, trainserie_test, drp_test, prev_test, act_test, filename1, "", False)
 
-def test_precision(x_test_raw : List[List[float]], y_test_raw: List[float], weight_test_raw: List[float], trainserie: List[str], drp: List[str], prev:List[str], act: List[str], path: str, df_columns, experiment_name):
+def test_precision(x_test_raw : List[List[float]], y_test_raw: List[float], weight_test_raw: List[float], trainserie: List[str], drp: List[str], prev:List[str], act: List[str], index: List[int], path: str, df_columns, experiment_name):
     mlflow.set_experiment(experiment_name)
     x_test = tf.constant(x_test_raw)
     y_test = tf.constant(y_test_raw)
@@ -160,9 +160,9 @@ def test_precision(x_test_raw : List[List[float]], y_test_raw: List[float], weig
     mae = sum([abs(x - y) for x, y in comparison]) / len(prediction_flatten)
     filename1 = path + "/" + str(
         round(mae, 2)) + "_testing_" + str(datetime.today().strftime('%Y_%m_%d_%H_%M_%S'))
-    return showMetrixes(prediction, y_test, trainserie, drp, prev, act, filename1, "", False)
+    return showMetrixes(prediction, y_test, trainserie, drp, prev, act, filename1, "", False, index)
 
-def testNN(x_raw : List[List[float]], y_raw : List[float], weight : List[float], trainserie : List[str], drp : List[str], prev :List[str], act : List[str], path : str, df_columns, experiment_name):
+def testPretrainedNN(x_raw : List[List[float]], y_raw : List[float], weight : List[float], trainserie : List[str], drp : List[str], prev :List[str], act : List[str], index : List[int], path : str, df_columns, experiment_name):
     mlflow.set_experiment(experiment_name)
     x = tf.constant(x_raw)
     y = tf.constant(y_raw)
@@ -199,9 +199,9 @@ def testNN(x_raw : List[List[float]], y_raw : List[float], weight : List[float],
     mae = sum([abs(x - y) for x, y in comparison]) / len(prediction_flatten)
     filename1 = path + "/" + str(
         round(mae, 2)) + "_testing_" + str(datetime.today().strftime('%Y_%m_%d_%H_%M_%S'))
-    return showMetrixes(prediction, y, trainserie, drp, prev, act, filename1, "", False)
+    return showMetrixes(prediction, y, trainserie, drp, prev, act, filename1, "", False, index)
 
-def showMetrixes(prediction, y_test, trainserie_test, drp_test, prev_test, act_test, filename : str, df_columns :str, to_file: bool):
+def showMetrixes(prediction, y_test, trainserie_test, drp_test, prev_test, act_test, filename : str, df_columns :str, to_file: bool, index: List[int] = []):
     prediction_flatten = [item for sublist in prediction for item in sublist]
 
     y_test_list = y_test.numpy().tolist()
@@ -222,6 +222,8 @@ def showMetrixes(prediction, y_test, trainserie_test, drp_test, prev_test, act_t
     df["drp"] = drp_test
     df["prev"] = prev_test
     df["act"] = act_test
+    if len(index) != 0:
+        df["index"] = index
     df = df.round(4)
     if (to_file):
         filename_csv = filename + ".csv"
