@@ -4,7 +4,7 @@ import pandas as pd
 from typing import List, Dict, Union
 from TrainRideNode import TrainRideNode
 
-def createindexDict(trn_sched_matrix : List[TrainRideNode]):
+def createindexDict(trn_sched_matrix : List[TrainRideNode]) -> Dict[str, int]:
     dict = {}
     for trn in trn_sched_matrix:
         index = trn.getIndex()
@@ -44,6 +44,7 @@ def dfToTrainRides(df : pd.DataFrame, index_dict = None) -> np.array:
 
 # Create format for data to feed in the causal discovery algorithms
 def TRN_matrix_to_delay_matrix(dataset_with_classes : np.array) -> np.array:
+    '''This function translate the np.array filled with TRO to a np.array of ints denoting the delay of each TRO'''
     array_with_delays_2d_new = np.zeros((len(dataset_with_classes), len(dataset_with_classes[0]))).astype(float)
     for index, day in enumerate(dataset_with_classes):
         array_with_delays_2d_new[index] = np.array(list(map(lambda x: x.getDelay(), day)))

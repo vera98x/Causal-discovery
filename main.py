@@ -2,7 +2,7 @@ from df_to_trn import TRN_matrix_to_delay_matrix, dfToTrainRides, createindexDic
 from csv_to_df import retrieveDataframe
 from createBackgroundKnowledge import DomainKnowledge, Graph_type
 from causallearn.utils.TXT2GeneralGraph import txt2generalgraph
-from FAS import FAS_method
+from PC_and_background import PCAndBackground
 from graph_to_nn_input import NN_samples
 from NeuralNetwork import preTrainedNN, precisionNN, testPretrainedNN, test_precision
 from Utils import gg2txt, traveltime_tester, saveGraph, print_number_freight
@@ -58,17 +58,17 @@ def main(fix_dataframe : bool, calculate_background : bool, path, import_name):
 
     if(calculate_background):
         # create a background and its schedule (background for Pc or FCI, cg_sched for GES)
-        dk = DomainKnowledge(trn_sched_matrix, path+'/sched.png', Graph_type.MINIMAL)
+        dk = DomainKnowledge(trn_sched_matrix, path+'/schedule.png', Graph_type.MINIMAL)
         bk, cg_sched = dk.create_background_knowledge_wrapper()  # get_CG_and_background(smaller_dataset, 'Results/sched.png')
 
-        fas_method = FAS_method('mv_fisherz', delays_to_feed_to_algo,
-                                path+'/6100_jan_nov_with_backg_FAS.png', trn_sched_matrix, bk, column_names)
-        gg = fas_method.fas_with_background(False)
-        gg2txt(gg, path+"/6100_FAS.txt")
+        hybrid_method = PCAndBackground('mv_fisherz', delays_to_feed_to_algo,
+                                     path +'/causal_graph.png', trn_sched_matrix, bk, column_names)
+        gg = hybrid_method.apply_pc_with_background(False)
+        gg2txt(gg, path+"/causal_graph.txt")
     else:
         print("retrieve value from file")
         start = time.time()
-        gg = txt2generalgraph(path+"/6100_FAS.txt")
+        gg = txt2generalgraph(path+"/causal_graph.txt")
         end = time.time()
         print("Retrieving graph from file took", end - start, "seconds")
 

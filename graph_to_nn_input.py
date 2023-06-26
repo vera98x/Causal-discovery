@@ -1,7 +1,7 @@
 import copy
 from datetime import date, datetime, time
 from causallearn.graph.GeneralGraph import GeneralGraph
-from FAS import FAS_method
+from PC_and_background import PCAndBackground
 from enum import Enum
 from typing import Dict, List, Tuple
 import numpy as np

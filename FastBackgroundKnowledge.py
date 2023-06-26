@@ -5,6 +5,9 @@ from causallearn.graph.GraphNode import GraphNode
 from causallearn.graph.GeneralGraph import GeneralGraph
 from typing import List
 class FastBackgroundKnowledge(BackgroundKnowledge):
+    '''The FastBackgroundKnowledge class is a subclass of the BackgroundKnowledge class of the causal-learn library:
+    https://github.com/py-why/causal-learn/blob/0.1.3.0/causallearn/utils/PCUtils/BackgroundKnowledge.py
+    Some functions are overwritten, but the code is still inspired/copied from the library.'''
     def __init__(self):
         super().__init__()
         self.dict_forbidden = {}

@@ -10,7 +10,7 @@ from Utils import createIDTRNDict
 from causallearn.utils.PCUtils.BackgroundKnowledge import BackgroundKnowledge
 
 
-class FAS_method():
+class PCAndBackground():
     def __init__(self,method : str, data : np.array, filename : str, sched_with_classes: np.array, bk : BackgroundKnowledge, column_names : List[str] = None):
         self.method = method
         self.data = data
@@ -21,6 +21,7 @@ class FAS_method():
         self.alpha = 0.05
 
     def fas_(self):
+        '''The creation of the FAS function is inspired by the code of the causal learn library: https://github.com/py-why/causal-learn/blob/0.1.3.0/causallearn/utils/Fas.py'''
         independence_test_method = CIT(self.data, method=self.method)
         nodes = []
         sepsets = {}
@@ -146,8 +147,7 @@ class FAS_method():
                     ggFas.add_directed_edge(node1, node2)
         return ggFas
 
-    def fas_with_background(self, print_graph) -> GeneralGraph:
-        with_or_without = "with" if self.bk != None else "without"
+    def apply_pc_with_background(self, print_graph) -> GeneralGraph:
         print("start with FAS with background")
         start = time.time()
         gg_fas, sep_sets = self.fas_()
