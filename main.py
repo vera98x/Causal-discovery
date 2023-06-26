@@ -25,14 +25,14 @@ def main_test():
     column_names = np.array(list(map(lambda x: x.getSmallerID(), sched_with_classes)))
 
     # create a background and its schedule (background for Pc or FCI, cg_sched for GES)
-    dk = DomainKnowledge(sched_with_classes, 'Test14_testsamples/sched.png', Graph_type.SWITCHES)
+    dk = DomainKnowledge(delay_matrix, 'Test14_testsamples/sched.png', Graph_type.SWITCHES)
     bk, cg_sched = dk.create_background_knowledge_with_timing()  # get_CG_and_background(smaller_dataset, 'Results/sched.png')
 
     gg_fas = cg_sched.G
     sample_changer = NN_samples(gg_fas, sched_with_classes, df)
     sample_changer.convert_graph_to_class()
-    sample_changer.findDelaysFromData(trn_matrix)
-    sample_changer.NN_input_rows_to_df("Test14_testsamples/nn_input.csv")
+    sample_changer.nodes_and_parents_list_to_input_rows_list(trn_matrix)
+    sample_changer.input_rows_list_to_df("Test14_testsamples/nn_input.csv")
 
     #sample_changer.NN_input_class_to_matrix("Test14_testsamples/nn_input.csv")
 
@@ -77,55 +77,13 @@ def main(calculate_background : bool, path, import_name):
 
     print("general_graph to nn")
     start = time.time()
-    sample_changer = NN_samples(general_graph, tro_schedule_list, df)
+    sample_changer = NN_samples(general_graph, tro_schedule_list)
     sample_changer.convert_graph_to_class() #
     print("find delays from data")
-    sample_changer.findDelaysFromData(tro_matrix)
+    sample_changer.nodes_and_parents_list_to_input_rows_list(tro_matrix)
     end = time.time()
     print("creating new input took", end - start, "seconds")
-    sample_changer.NN_input_rows_to_df(path + "/nn_input.csv")
-
-
-def splitPrimaryDelay(df):
-    dependency_delays = df[["prev_event","prev_prev_event","prev_platform","dep1","dep2","dep3"]]
-    dependency_delays.mask(dependency_delays <=0, 0, inplace=True)
-    dependency_delays = dependency_delays.fillna(0)
-    dependency_delays["total"] = dependency_delays["prev_event"] + dependency_delays["prev_prev_event"]+ dependency_delays["prev_platform"] +\
-                                dependency_delays["dep1"] + dependency_delays["dep2"] + dependency_delays["dep3"]
-    prim = df[dependency_delays['total']>0]
-    no_delay = df[dependency_delays['total']<=0]
-    return prim, no_delay
-
-def variances(df = None):
-    if df is None:
-        df = pd.read_csv('Test17_Rotterdam/nn_input.csv', sep=";")
-    #only take id and delay, everything else is not important
-    #df = df[["id","delay"]]
-    df = df.dropna(subset=["delay"])
-    group_id = df.groupby(['trainserie','drp'])
-    grouped_by_id = [group_id.get_group(x) for x in group_id.groups]
-    for index, group in enumerate(grouped_by_id):
-        prim_df, no_delay_df = splitPrimaryDelay(group)
-        print(group.trainserie.values[0], group.drp.values[0])
-        #group = group.query('delay <= 900 & delay >= -900')
-        print("Prim: ------------------------------------")
-        prim_df = prim_df.assign(variance=prim_df.delay.values.var())
-        prim_df = prim_df.assign(std=prim_df.delay.values.std())
-        prim_df = prim_df.assign(mean=prim_df.delay.values.mean())
-        print("amount of samples: ", len(prim_df.trainserie.values))
-        print("Variance :", prim_df.delay.values.var())
-        print("std: ", prim_df.delay.values.std())
-        print("No delay: ------------------------------------")
-        no_delay_df = no_delay_df.assign(variance=no_delay_df.delay.values.var())
-        no_delay_df = no_delay_df.assign(std=no_delay_df.delay.values.std())
-        no_delay_df = no_delay_df.assign(mean=no_delay_df.delay.values.mean())
-        print("amount of samples: ", len(no_delay_df.trainserie.values))
-        print("Variance :", no_delay_df.delay.values.var())
-        print("std: ", no_delay_df.delay.values.std())
-        print()
-        grouped_by_id[index] = pd.concat([prim_df, no_delay_df])
-    df_new = pd.concat(grouped_by_id)
-    return df_new
+    sample_changer.input_rows_list_to_df(path + "/nn_input.csv")
 
 def accuracy_per_group(filename, destination_path, list_to_group_on = None, bucket = False):
     df = pd.read_csv(filename, sep=";")
@@ -184,16 +142,6 @@ def accuracy_per_group(filename, destination_path, list_to_group_on = None, buck
 
     df.to_csv(destination_path+"/acc_per_group.csv", index = False, sep = ";")
 
-def relativeError():
-    df = pd.read_csv('Test21_add_extra_columns/nn_output_2023_04_06_15_18_16_11.12.csv', sep=";")
-    prev_error = abs(df.prev.values - df.actual.values)
-    estimation_error = abs(df.prediction.values - df.actual.values)
-    relative_error = estimation_error/prev_error
-    print(np.sort(relative_error))
-    print("Median: ", np.median(relative_error))
-    print("Mean: ", np.mean(relative_error))
-
-
 def create_train_and_test(path_input, path_output):
     df = pd.read_csv(path_input + '/nn_input.csv', sep=";")
     df = df.dropna(subset=['delay'])
@@ -207,7 +155,7 @@ def create_train_and_test(path_input, path_output):
     train_set.to_csv(path_output + "/nn_input_train.csv", index=False, sep=";")
     test_set.to_csv(path_output + "/nn_input_test.csv", index=False, sep=";")
 
-def preprocess_df(df, weights, subset_with_only_interaction, dep_columns):
+def preprocess_df_nn(df, weights, subset_with_only_interaction, dep_columns):
     # if the prev event or the delay is not known, remove it from the dataframe
     df = df.dropna(subset=['delay'])
     df = df.dropna(subset=['prev_event'])
@@ -239,8 +187,8 @@ def main_nn(train_pre_nn: bool, test_pre_trained_nn: bool, train_precision_nn: b
     df_train = pd.read_csv(path+'/nn_input_train.csv', sep = ";")
     df_test = pd.read_csv(path + '/nn_input_test.csv', sep=";")
     print("train: ", len(df_train), "test: ", len(df_test))
-    df_train = preprocess_df(df_train, weights, subset_with_only_interaction, dep_columns)
-    df_test = preprocess_df(df_test, weights, subset_with_only_interaction, dep_columns)
+    df_train = preprocess_df_nn(df_train, weights, subset_with_only_interaction, dep_columns)
+    df_test = preprocess_df_nn(df_test, weights, subset_with_only_interaction, dep_columns)
 
     remaining_df_train = df_train[df_train.columns[~df_train.columns.isin(["id", 'delay', "trainserie", "drp", "act", "weight", "cause", "index_total"])]]
     remaining_df_test= df_test[df_test.columns[~df_test.columns.isin(["id", 'delay', "trainserie", "drp", "act", "weight", "cause", "index_total"])]]
@@ -308,6 +256,8 @@ def main_nn(train_pre_nn: bool, test_pre_trained_nn: bool, train_precision_nn: b
                                      experiment_name2)
                 total_df = pd.concat([total_df, new_df])
         total_df.to_csv(path + "/tested_merged_files_" + temp + ".csv", index=False, sep=";")
+
+main(calculate_background = True, path="Tests", import_name = "Data/Rtd-Ddr_short.csv")
 
 # main(calculate_background = True, path="Test50_asd", datasetname = "Data/Asd-Ut.csv" )
 # create_train_and_test(path_input="Test50_asd", path_output="Test50_asd")
