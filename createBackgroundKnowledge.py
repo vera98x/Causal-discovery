@@ -29,26 +29,14 @@ def createStationDict(train_serie_day: np.array) -> Dict[str, Tuple[datetime.tim
             station_dict[trn.getStation()] = arrivalpairs + [(trn.getPlannedTime(), trn)]
     return station_dict
 
-def variableNamesToNumber(day : List[TrainRideNode]) -> Tuple[Dict[str,str], Dict[str,str]]:
-    counter = 1
-    trn_name_id_dict = {}
-    id_trn_name_dict = {}
-    for trn in day:
-        trn_name_id_dict[trn.getID()] = 'X' + str(counter)
-        id_trn_name_dict['X' + str(counter)] = trn.getID()
-        counter += 1
-
-    return trn_name_id_dict, id_trn_name_dict
-
 class DomainKnowledge:
-    def __init__(self, sched_with_classes : np.array, filename: str, type : Graph_type):
+    def __init__(self, sched_with_classes : np.array, type : Graph_type):
         self.graph_type = type
         self.sched_with_classes = sched_with_classes
-        self.filename = filename
-        #self.trn_name_id_dict, self.id_trn_name_dict = variableNamesToNumber(sched_with_classes) # TODO: can this be removed?
         self.column_names = np.array(list(map(lambda x: x.getSmallerID(), sched_with_classes)))
         self.station_dict = createStationDict(sched_with_classes)
     def makeEverythingForbidden(self, train_serie_day: np.array, bk: FastBackgroundKnowledge) -> FastBackgroundKnowledge:
+        '''Makes every node combination marked as forbidden'''
         train_serie_day_names = [trn.getSmallerID() for trn in train_serie_day]
         for trn_index in range(len(train_serie_day_names)):
             trn_name = train_serie_day_names[trn_index]
@@ -59,6 +47,7 @@ class DomainKnowledge:
             bk.addForbiddenDependency_dict(trn_name, other_deps)
         return bk
     def addRequiredBasedTrainSerie(self, train_serie_day: np.array, bk: FastBackgroundKnowledge) -> FastBackgroundKnowledge:
+        '''Marks the trains with the same train number at consequtive events required'''
         # trainseries contains a 1D array containing TreinRideNode data of one day
         # for each train ride and every stop/station, add a chain of dependencies
         # s1->s2->s3
@@ -76,6 +65,7 @@ class DomainKnowledge:
         return bk
 
     def addPossibleBasedStation(self, bk: FastBackgroundKnowledge) -> FastBackgroundKnowledge:
+        '''For trains within 15 minutes and at the same station, remove the forbidden dependency'''
         buffer = 15  # minutes
         for station, station_list in self.station_dict.items():
             # sort on planned time
@@ -99,12 +89,12 @@ class DomainKnowledge:
                             bk.removeForbiddenDependency_dict(other_trn.getSmallerID(), trn.getSmallerID())
         return bk
     def create_background_knowledge(self) -> FastBackgroundKnowledge:
-        # make sure that the order of train rides is ordered by train numbers
+        # important: the order of train rides should be ordered by train numbers and planned type
 
         # create background knowledge, take into account:
-        # 1. The train that follows its route (chain of actions), depends on the previous action of the train, thus there is a direct cause.
-        # 2. Trains that are on the same station within x minutes may have a direct cause.
-        # 3. Trains that are not in the same station cannot have a direct cause.
+        # 1. The train that follows its route (chain of actions), depends on the previous action of the train, thus there is a direct cause. (required edge)
+        # 2. Trains that are on the same station within 15 minutes may have a direct cause. (possible edge)
+        # 3. Trains that are not in the same station cannot have a direct cause. (forbidden edge)
 
         bk = FastBackgroundKnowledge()
         # first add the required edges, then the forbidden edges (forbidden edges checks if some edge was already required, then it does not add a forbidden edge)
@@ -117,18 +107,11 @@ class DomainKnowledge:
         return bk
 
 
-    def create_background_knowledge_wrapper(self) -> Tuple[FastBackgroundKnowledge, CausalGraph]:
+    def create_background_knowledge_wrapper(self) -> FastBackgroundKnowledge:
 
         print("Creating background knowledge")
         start = time.time()
         background = self.create_background_knowledge()
         end = time.time()
         print("creating schedule took", end - start, "seconds")
-
-        cg_sched = background.backgroundToGraph(self.column_names)
-        # labels = column_names
-        #pdy = GraphUtils.to_pydot(cg_sched.G, labels=self.column_names)
-        #pdy.write_png(self.filename)
-        #background.required_rules_to_dict()
-        #background.forbidden_rules_to_dict()
-        return background, cg_sched
+        return background

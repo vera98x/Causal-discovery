@@ -36,33 +36,33 @@ def main_test():
 
     #sample_changer.NN_input_class_to_matrix("Test14_testsamples/nn_input.csv")
 
-def main(fix_dataframe : bool, calculate_background : bool, path, import_name):
+def main(calculate_background : bool, path, import_name):
     print("Phase: dataframe cleaning and to TRO")
     # extract dataframe and impute missing values
     df, sched = retrieveDataframe(import_name, True)
     df.to_csv(path+"/df_done.csv", index=False, sep=";")
     sched.to_csv(path+"/sched_done.csv", index=False, sep=";")
     print("done extracting", len(df))
-    trn_sched_matrix = dfToTrainRides(sched)[0]
+    tro_schedule_list = dfToTrainRides(sched)[0]
     # create schedule of the Train ride nodes
-    index_dict = createindexDict(trn_sched_matrix)
+    index_dict = createindexDict(tro_schedule_list)
     # change the dataframe to trainRideNodes
-    trn_matrix = dfToTrainRides(df, index_dict)
+    tro_matrix = dfToTrainRides(df, index_dict)
 
     print("translating dataset to 2d array for algo")
-    print("Amount of variables: ", len(trn_matrix[0]))
+    print("Amount of variables: ", len(tro_matrix[0]))
 
     # translate the TrainRideNodes to delays
-    column_names = np.array(list(map(lambda x: x.getSmallerID(), trn_sched_matrix)))
-    delays_to_feed_to_algo = TRN_matrix_to_delay_matrix(trn_matrix)
+    column_names = np.array(list(map(lambda x: x.getSmallerID(), tro_schedule_list)))
+    delays_matrix = TRN_matrix_to_delay_matrix(tro_matrix)
 
     if(calculate_background):
-        # create a background and its schedule (background for Pc or FCI, cg_sched for GES)
-        dk = DomainKnowledge(trn_sched_matrix, path+'/schedule.png', Graph_type.MINIMAL)
-        bk, cg_sched = dk.create_background_knowledge_wrapper()  # get_CG_and_background(smaller_dataset, 'Results/sched.png')
+        # create a background from the schedule
+        dk = DomainKnowledge(tro_schedule_list, Graph_type.MINIMAL)
+        bk = dk.create_background_knowledge_wrapper()
 
-        hybrid_method = PCAndBackground('mv_fisherz', delays_to_feed_to_algo,
-                                     path +'/causal_graph.png', trn_sched_matrix, bk, column_names)
+        hybrid_method = PCAndBackground('mv_fisherz', delays_matrix,
+                                     path +'/causal_graph.png', tro_schedule_list, bk, column_names)
         gg = hybrid_method.apply_pc_with_background(False)
         gg2txt(gg, path+"/causal_graph.txt")
     else:
@@ -76,10 +76,10 @@ def main(fix_dataframe : bool, calculate_background : bool, path, import_name):
 
     print("gg to nn")
     start = time.time()
-    sample_changer = NN_samples(gg, trn_sched_matrix, df)
+    sample_changer = NN_samples(gg, tro_schedule_list, df)
     sample_changer.convert_graph_to_class() #
     print("find delays from data")
-    sample_changer.findDelaysFromData(trn_matrix)
+    sample_changer.findDelaysFromData(tro_matrix)
     end = time.time()
     print("creating new input took", end - start, "seconds")
     sample_changer.NN_input_rows_to_df(path + "/nn_input.csv")
@@ -308,7 +308,7 @@ def main_nn(train_pre_nn: bool, test_pre_trained_nn: bool, train_precision_nn: b
                 total_df = pd.concat([total_df, new_df])
         total_df.to_csv(path + "/tested_merged_files_" + temp + ".csv", index=False, sep=";")
 
-# main(fix_dataframe= True, calculate_background = True, path="Test50_asd", datasetname = "Data/Asd-Ut.csv" )
+# main(calculate_background = True, path="Test50_asd", datasetname = "Data/Asd-Ut.csv" )
 # create_train_and_test(path_input="Test50_asd", path_output="Test50_asd")
 # main_nn(train_pre_nn= True, test_pre_trained_nn= False, train_precision_nn=True, test_precision_bool = True, subset_with_only_interaction= False, weights= False, dep_columns= True,
 #        path="Test50_asd", experiment_name1="Ehv_dep_train_buffer_15_min", experiment_name2="Asd_dep_test_buffer_15_min", temp="column_causes")

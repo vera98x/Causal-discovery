@@ -14,19 +14,26 @@ class FastBackgroundKnowledge(BackgroundKnowledge):
         self.dict_required = {}
 
     def addForbiddenDependency_dict(self, node1_name: str, node2_names: List[str]) -> None:
+        '''Adds the name of node 2 of the list of forbidden dependencies'''
         dep_list = self.dict_forbidden.get(node1_name, [])
         self.dict_forbidden[node1_name] = dep_list + node2_names
 
     def addDependency_dict(self, node1_name: str, node2_name: str) -> None:
+        '''Adds the name of node 2 of the list of required dependencies,
+        It also removes the forbidden dependency, else this would be conflicting'''
         dep_list = self.dict_required.get(node1_name, [])
         self.removeForbiddenDependency_dict(node1_name, node2_name)
         self.dict_required[node1_name] = dep_list + [node2_name]
     def removeForbiddenDependency_dict(self, node1_name: str, node2_name: str) -> None:
+        '''Removes the name of node 2 of the list of forbidden dependencies'''
         dep_list = self.dict_forbidden.get(node1_name, [])
         newdep = list(filter(lambda a: a != node2_name, dep_list))
         self.dict_forbidden[node1_name] = newdep
 
     def backgroundToGraph(self, column_names: List[str]) -> CausalGraph:
+        '''A causal graph is made from the background knowledge
+        Parameter: column names in a specific order
+        Return type: CausalGraph'''
         # create all nodes
         nodes = [GraphNode(i) for i in column_names]
         node_dict = {}
