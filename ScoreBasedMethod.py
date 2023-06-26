@@ -5,7 +5,7 @@ from causallearn.utils.DAG2CPDAG import dag2cpdag
 from causallearn.utils.GESUtils import *
 from causallearn.utils.PDAG2DAG import pdag2dag
 from causallearn.utils.GraphUtils import GraphUtils
-from df_to_trn import dfToTrainRides, TRN_matrix_to_delay_matrix
+from df_to_tro import dfToTrainRides, TRO_matrix_to_delay_matrix
 from csv_to_df import retrieveDataframe
 #from createSuperGraph import get_CG_and_superGraph
 

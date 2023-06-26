@@ -6,17 +6,16 @@ from causallearn.graph.Edges import Edges
 import copy
 from causallearn.utils.cit import *
 from typing import Dict, Tuple, List
-from Utils import createIDTRNDict
+from Utils import createIDTRODict
 from causallearn.utils.PCUtils.BackgroundKnowledge import BackgroundKnowledge
 
 
 class PCAndBackground():
-    def __init__(self,method : str, data : np.array, filename : str, sched_with_classes: np.array, bk : BackgroundKnowledge, column_names : List[str] = None):
+    def __init__(self, method : str, data : np.array, tro_schedule_list: np.array, bk : BackgroundKnowledge):
         self.method = method
         self.data = data
-        self.filename = filename
-        self.id_trn_dict = createIDTRNDict(sched_with_classes)
-        self.column_names = column_names
+        self.id_tro_dict = createIDTRODict(tro_schedule_list)
+        self.column_names = column_names = np.array(list(map(lambda x: x.getSmallerID(), tro_schedule_list)))
         self.bk = bk
         self.alpha = 0.05
 
@@ -113,8 +112,8 @@ class PCAndBackground():
         num_vars = len(nodes)
         for node in nodes:
             node_name = node.get_name()
-            trn_time = self.id_trn_dict[node_name].getPlannedTime_time()
-            node.add_attribute('time', trn_time)
+            tro_time = self.id_tro_dict[node_name].getPlannedTime_time()
+            node.add_attribute('time', tro_time)
         edges = ggFas.get_graph_edges()
         # empty the complete graph
         ggFas.graph = np.zeros((num_vars, num_vars), np.dtype(int))
@@ -123,16 +122,16 @@ class PCAndBackground():
             # get nodes from edge
             node1 = edge.get_node1()
             node2 = edge.get_node2()
-            # map edges to TRN + get time
-            trn1_time = node1.get_attribute('time')
-            trn2_time = node2.get_attribute('time')
+            # map edges to TRO + get time
+            tro1_time = node1.get_attribute('time')
+            tro2_time = node2.get_attribute('time')
 
             reverse = False
-            if (trn1_time.hour == 23 or trn2_time.hour == 23) and (trn1_time.hour == 0 or trn2_time.hour == 0):
+            if (tro1_time.hour == 23 or tro2_time.hour == 23) and (tro1_time.hour == 0 or tro2_time.hour == 0):
                 reverse = True
 
             #order in timewise
-            if trn1_time > trn2_time:
+            if tro1_time > tro2_time:
                 #add directed edge
                 if(reverse):
                     ggFas.add_directed_edge(node1, node2)
@@ -147,7 +146,13 @@ class PCAndBackground():
                     ggFas.add_directed_edge(node1, node2)
         return ggFas
 
-    def apply_pc_with_background(self, print_graph) -> GeneralGraph:
+    def apply_pc_with_background(self, graph_save_png_bool, filename = None) -> GeneralGraph:
+        '''The PC-algorithm is applies
+        first it performs a skeleton search using the self.fas_() fucntion
+        then it orients the edges.
+        Per step, the timing is captured and lastly, the graph can be saved as an image'''
+        if(graph_save_png_bool == True and filename == None):
+            raise ValueError("Filename is not provided, but print_graph_bool is True")
         print("start with FAS with background")
         start = time.time()
         gg_fas, sep_sets = self.fas_()
@@ -156,7 +161,7 @@ class PCAndBackground():
         gg_fas = self.orientEdges(gg_fas)
         end = time.time()
         print("creating SCM of FAS with background is done, it took", end - start, "seconds")
-        if print_graph:
+        if graph_save_png_bool:
             pdy = GraphUtils.to_pydot(gg_fas, labels=self.column_names)
-            pdy.write_png(self.filename)
+            pdy.write_png(filename)
         return gg_fas

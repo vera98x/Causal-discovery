@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 from keras.utils import to_categorical
 from sklearn.preprocessing import LabelEncoder
-from Utils import createIDTRNDict, nan_equal
+from Utils import createIDTRODict, nan_equal
 
 class Station_type(Enum):
     SMALL = 1
@@ -186,7 +186,7 @@ class NN_samples:
         self.nodes_and_parents_list = []
         self.gg = gg
         self.sched_with_classes = sched_with_classes
-        self.id_trn = createIDTRNDict(sched_with_classes)
+        self.id_trn = createIDTRODict(sched_with_classes)
         self.df = df
         self.list_input_rows = []
 

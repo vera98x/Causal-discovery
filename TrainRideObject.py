@@ -1,6 +1,6 @@
 import datetime
 import numpy as np
-class TrainRideNode:
+class TrainRideObject:
     def __init__(self, trainSerie : str, trainRideNumber: str, stationName: str, platformNumber: int, activity: str, delay: float, globalTime : datetime.time,
                  plannedTime : datetime, buffer : int, date : datetime.date, traveltime :float, wissels : str, speed: int, traintype : str, trainmat :str, slack: int, cause_train: str, index = None):
         self.trainSerie = trainSerie
@@ -91,5 +91,5 @@ class TrainRideNode:
         return self.cause_train
     def getIndex(self):
         return self.index
-    def setIndex(self, index):
+    def setColumnIndex(self, index):
         self.index = index

@@ -1,10 +1,10 @@
 """### Create BackgroundKnowlegde"""
 import numpy as np
 from typing import Dict, Tuple, List
-from TrainRideNode import TrainRideNode
+from TrainRideObject import TrainRideObject
 import datetime
 
-def createStationDict(train_serie_day: np.array) -> Dict[str, Tuple[datetime.time, TrainRideNode]]:
+def createStationDict(train_serie_day: np.array) -> Dict[str, Tuple[datetime.time, TrainRideObject]]:
     # Partition the data per station, such that we can find dependencies within a station fast
     station_dict = {}  # example: bkl: [(8:15, TrainRideNode1), (13:05, TrainRideNode2)]
 
@@ -17,7 +17,7 @@ def createStationDict(train_serie_day: np.array) -> Dict[str, Tuple[datetime.tim
             station_dict[trn.getStation()] = arrivalpairs + [(trn.getPlannedTime(), trn)]
     return station_dict
 
-def variableNamesToNumber(day : List[TrainRideNode]) -> Tuple[Dict[str,str], Dict[str,str]]:
+def variableNamesToNumber(day : List[TrainRideObject]) -> Tuple[Dict[str,str], Dict[str,str]]:
     counter = 1
     trn_name_id_dict = {}
     id_trn_name_dict = {}

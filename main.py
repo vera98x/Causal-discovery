@@ -1,4 +1,4 @@
-from df_to_trn import TRN_matrix_to_delay_matrix, dfToTrainRides, createindexDict
+from df_to_tro import TRO_matrix_to_delay_matrix, dfToTrainRides, create_dict_TROid_column_index
 from csv_to_df import retrieveDataframe
 from createBackgroundKnowledge import DomainKnowledge, Graph_type
 from causallearn.utils.TXT2GeneralGraph import txt2generalgraph
@@ -18,7 +18,7 @@ def main_test():
     sched.to_csv("Test14_testsamples/sched_done.csv", index=False, sep=";")
     trn_matrix = dfToTrainRides(df)
     # # translate the TrainRideNodes to delays
-    delay_matrix = TRN_matrix_to_delay_matrix(trn_matrix)
+    delay_matrix = TRO_matrix_to_delay_matrix(trn_matrix)
 
     sched_with_classes = dfToTrainRides(sched)[0]
     print("Amount of variables: ", len(trn_matrix[0]))
@@ -26,7 +26,7 @@ def main_test():
 
     # create a background and its schedule (background for Pc or FCI, cg_sched for GES)
     dk = DomainKnowledge(sched_with_classes, 'Test14_testsamples/sched.png', Graph_type.SWITCHES)
-    bk, cg_sched = dk.create_background_knowledge_wrapper()  # get_CG_and_background(smaller_dataset, 'Results/sched.png')
+    bk, cg_sched = dk.create_background_knowledge_with_timing()  # get_CG_and_background(smaller_dataset, 'Results/sched.png')
 
     gg_fas = cg_sched.G
     sample_changer = NN_samples(gg_fas, sched_with_classes, df)
@@ -38,45 +38,46 @@ def main_test():
 
 def main(calculate_background : bool, path, import_name):
     print("Phase: dataframe cleaning and to TRO")
+    #---------------------------------------------------- start retrieving and cleaning dataframe
     # extract dataframe and impute missing values
     df, sched = retrieveDataframe(import_name, True)
     df.to_csv(path+"/df_done.csv", index=False, sep=";")
     sched.to_csv(path+"/sched_done.csv", index=False, sep=";")
-    print("done extracting", len(df))
-    tro_schedule_list = dfToTrainRides(sched)[0]
+    print("done clearning df, len df:", len(df))
+    # ---------------------------------------------------- end retrieving and cleaning dataframe
+    # ---------------------------------------------------- start translating df to TrainRideObjects
     # create schedule of the Train ride nodes
-    index_dict = createindexDict(tro_schedule_list)
+    tro_schedule_list = dfToTrainRides(df=sched)[0]
+    #create a dictionary providing the column indexes per tro
+    column_index_dict = create_dict_TROid_column_index(tro_schedule_list=tro_schedule_list)
     # change the dataframe to trainRideNodes
-    tro_matrix = dfToTrainRides(df, index_dict)
-
-    print("translating dataset to 2d array for algo")
-    print("Amount of variables: ", len(tro_matrix[0]))
-
+    tro_matrix = dfToTrainRides(df=df, column_index_dict=column_index_dict)
     # translate the TrainRideNodes to delays
-    column_names = np.array(list(map(lambda x: x.getSmallerID(), tro_schedule_list)))
-    delays_matrix = TRN_matrix_to_delay_matrix(tro_matrix)
+    delays_matrix = TRO_matrix_to_delay_matrix(tro_matrix=tro_matrix)
+    print("done translating df to TRO")
+    # ---------------------------------------------------- end translating df to TrainRideObjects
 
     if(calculate_background):
         # create a background from the schedule
-        dk = DomainKnowledge(tro_schedule_list, Graph_type.MINIMAL)
-        bk = dk.create_background_knowledge_wrapper()
+        dk = DomainKnowledge(tro_schedule_list=tro_schedule_list, type=Graph_type.MINIMAL)
+        bk = dk.create_background_knowledge_with_timing()
 
-        hybrid_method = PCAndBackground('mv_fisherz', delays_matrix,
-                                     path +'/causal_graph.png', tro_schedule_list, bk, column_names)
-        gg = hybrid_method.apply_pc_with_background(False)
-        gg2txt(gg, path+"/causal_graph.txt")
+        hybrid_method = PCAndBackground(method = 'mv_fisherz', data=delays_matrix, tro_schedule_list = tro_schedule_list, bk=bk)
+        general_graph = hybrid_method.apply_pc_with_background(graph_save_png_bool= False, filename=path + '/causal_graph.png')
+        # save the calculated graph
+        gg2txt(general_graph, path+"/causal_graph.txt")
     else:
-        print("retrieve value from file")
+        print("retrieve the general graph from file")
         start = time.time()
-        gg = txt2generalgraph(path+"/causal_graph.txt")
+        general_graph = txt2generalgraph(path+"/causal_graph.txt")
         end = time.time()
         print("Retrieving graph from file took", end - start, "seconds")
 
     # -----------------------
 
-    print("gg to nn")
+    print("general_graph to nn")
     start = time.time()
-    sample_changer = NN_samples(gg, tro_schedule_list, df)
+    sample_changer = NN_samples(general_graph, tro_schedule_list, df)
     sample_changer.convert_graph_to_class() #
     print("find delays from data")
     sample_changer.findDelaysFromData(tro_matrix)

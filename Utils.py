@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from csv_to_df import retrieveDataframe
 import numpy as np
 from typing import Dict
-from TrainRideNode import TrainRideNode
+from TrainRideObject import TrainRideObject
 import math
 import pandas as pd
 from causallearn.utils.GraphUtils import GraphUtils
@@ -81,7 +81,7 @@ def plotDelay():
     plt.ylim(-3, 30000)
     plt.show()
 
-def createIDTRNDict(sched_with_classes : np.array) -> Dict[str, TrainRideNode]:
+def createIDTRODict(sched_with_classes : np.array) -> Dict[str, TrainRideObject]:
     result_dict = {}
     for trn in sched_with_classes:
         result_dict[trn.getSmallerID()] = trn
