@@ -239,3 +239,60 @@ def print_number_freight(filename):
     df_freight = df.loc[df['basic_treinnr_rijkarakter'] == "GO"]
     print(len(df_freight))
     print("Percentage: ", 100/len(df)*len(df_freight))
+
+def accuracy_per_group(filename, destination_path, list_to_group_on = None, bucket = False):
+    df = pd.read_csv(filename, sep=";")
+    if bucket:
+        df["bucket"] = df["actual"].apply(lambda x: math.floor(x // 30))
+    else:
+        df["bucket"] = 0
+    print(list_to_group_on)
+    if ( list_to_group_on != None):
+        group_drp = df.groupby(list_to_group_on)
+        grouped_by_drp = [group_drp.get_group(x) for x in group_drp.groups]
+    else:
+        grouped_by_drp = [df]
+    df = pd.DataFrame(columns=["Index","Amount of samples","15_sec", "30_sec", "MAE", "RMSE", "prev_median", "prev_mean", "MdAPE", "MAPE"])
+    for index, group in enumerate(grouped_by_drp):
+        print(group.trainserie.values[0], group.drp.values[0], "bucket:", group[[*list_to_group_on]].values[0])
+        f = lambda x: float(x)
+        g = lambda s: s.replace(",", ".")
+        y = np.array(list(map(f, group.actual.values)))
+        y_hat_str = np.array(list(map(f, group.prediction.values)))
+        y_hat = np.array(list(map(f, y_hat_str)))
+        prev = np.array(list(map(f, group.prev.values)))
+        diff = abs(y_hat - y)
+        print("amount of test samples: ", len(group.prediction.values))
+        percentage15 = sum(i <= 15 for i in diff)/len(diff)
+        percentage30 = sum(i <= 30 for i in diff) / len(diff)
+        print("Percentage within 15 sec: ", percentage15)
+        print("Percentage within 30 sec: ", percentage30)
+        mae = sum(abs(y_hat - y))/len(y)
+        rmse = math.sqrt(sum(abs(y_hat - y)**2) / len(y))
+        prev_median = np.median(np.nan_to_num((abs(y_hat - y)/abs(prev-y) * 100)))
+        mdape = np.median(np.nan_to_num(abs((y_hat - y)/y)*100))
+        print("MAE:", mae)
+        print("RMSE:", rmse)
+        print("Comparing to prev, median: ", prev_median)
+        print("MdAPE, median: ", mdape)
+
+        indexes_mdape = np.nonzero( ((y < 1) & (y > -1)))
+        y_filtered_mdape = np.delete(y, indexes_mdape)
+        y_hat_filtered_mdape = np.delete(y_hat, indexes_mdape)
+        mape = str(round(np.mean(np.nan_to_num(abs((y_hat_filtered_mdape - y_filtered_mdape) / y_filtered_mdape) * 100)),3))
+
+        print("MdAPE, mean: ", mape)
+
+        diff_prev = prev-y
+        indexes_prev = np.nonzero( ((diff_prev < 1) & (diff_prev > -1)))
+        diff_prev_filtered = np.delete(diff_prev, indexes_prev)
+        y_filtered_prev = np.delete(y, indexes_prev)
+        y_hat_filtered_prev = np.delete(y_hat, indexes_prev)
+        prev_mean = str(round(np.mean(np.nan_to_num((abs(y_hat_filtered_prev - y_filtered_prev)/abs(diff_prev_filtered) * 100))),3))
+        print("Comparing to prev, mean: ",  prev_mean)
+
+        new_row = [group[[*list_to_group_on]].values[0], len(group.prediction.values), round(percentage15,3), round(percentage30,3), round(mae,3), round(rmse,3), round(prev_median,3), prev_mean, round(mdape,3),mape]
+        df = df.append(pd.Series(new_row, index=df.columns), ignore_index = True)
+        print()
+
+    df.to_csv(destination_path+"/acc_per_group.csv", index = False, sep = ";")
