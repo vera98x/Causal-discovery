@@ -15,7 +15,7 @@ class NodeAndParents:
         self.prev_event = None
         self.prev_prev_event = None
         self.dep0_platform = None
-        self.dep = [] # dependencies
+        self.dep = [] # dependencies, length is not restricted
 
     def get_itself_and_all_parents(self, max_len_dep : int) -> List[Union[TrainRideObject,None]]:
         '''
@@ -161,6 +161,7 @@ class NN_samples:
         encoded_activity = to_categorical(integer_activity)
 
         for index, item in enumerate(self.input_rows_list):
+            # place the variables per item in the correct order and add to the list
             row = [item.label, item.drp, item.trainserie, item.activity, *item.dep_delay, *item.timeinterval, *encoded_type_train[index], *encoded_station_type[index],
                    *encoded_day_of_the_week[index], *encoded_peakhour[index], item.buffer, item.traveltime, *encoded_activity[index], item.minimal_dwell_time, item.traveldistance, item.speed, item.slack, item.cause]
             x.append(row)

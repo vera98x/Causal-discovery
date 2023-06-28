@@ -13,7 +13,7 @@ def keepTrainseries(df_input : pd.DataFrame, act_val : List[str]) ->  pd.DataFra
 
     return df_input
 def keepWorkDays(df_input : pd.DataFrame) ->  pd.DataFrame:
-    # translate date to number 1 - 7 and is ma -su
+    # translate date to number 1 - 7 and is ma - su
     df_input['daynumber'] = df_input['date'].apply(lambda x: int(x.strftime("%u")))
     # weekdays are between 1-5
     df_input = df_input[(df_input['daynumber'] <= 5)]
@@ -41,7 +41,8 @@ def makeDataUniform(df : pd.DataFrame, sched : pd.DataFrame) ->  pd.DataFrame:
     for day_index in range(len(grouped_by_date)):
         day = grouped_by_date[day_index]
         day_date = day.iloc[0]['date']
-
+        # find differences, and drop all overlapping values between the schedule and the day. If there are remaining
+        # values, these need to be inserted or removed
         diff = pd.concat([sched, day]).drop_duplicates(subset=['basic_treinnr', 'basic_drp', 'basic_drp_act'],
                                                          keep=False)
         if (len(diff) != 0):
@@ -49,7 +50,8 @@ def makeDataUniform(df : pd.DataFrame, sched : pd.DataFrame) ->  pd.DataFrame:
             # remove the extra activities
             # find activities that are not in the schedule
             remove_extra_activities = diff[~(diff["date"] == sched_date)]
-            # add those activities again to the day dataframe, and drop the duplicates
+            # add those activities again to the day dataframe, and drop the duplicates, such that all items that should
+            # be removed are removed
             df_res = pd.concat([day, remove_extra_activities]).drop_duplicates(
                 subset=['basic_treinnr', 'basic_drp', 'basic_drp_act', 'date'],
                 keep=False)
@@ -63,10 +65,9 @@ def makeDataUniform(df : pd.DataFrame, sched : pd.DataFrame) ->  pd.DataFrame:
             add_extra_activities["basic_plan_tomorrow"] = add_extra_activities["basic_plan"].apply(lambda x: x + dt.timedelta(days=1))
             add_extra_activities['basic_plan'] = np.where(add_extra_activities['same_date'] == True, add_extra_activities['basic_plan'], add_extra_activities['basic_plan_tomorrow'])
             add_extra_activities = add_extra_activities.drop(columns=["basic_plan_tomorrow"])
-            #df["basic_plan"] = df["basic_plan"].apply(lambda x: x + dt.timedelta(days=1) if x.hour <= 4 else x)
 
 
-            # overlap the delays (if there are too many np.nan, the mv_fischer cannot handle it)
+            # Remove the delays of the inserted events, such that they resemble a cancelled train
             add_extra_activities['basic_uitvoer'] = np.nan
             add_extra_activities['delay'] = np.nan
             add_extra_activities = add_extra_activities.drop(columns=["time"])
@@ -114,8 +115,6 @@ def addTravelTimeColumn(df):
     df.loc[(df['basic_treinnr'] != df['basic_treinnr'].shift(1)) , 'traveltime'] = np.nan
     # if those events are not at the same date, fill with 0
     df.loc[(df['date'] != df['date'].shift(1)), 'traveltime'] =np.nan
-    # for each event for which there was no 'upper' row to compare with, it is na, so also fill that with 0
-    #df['traveltime'] = df.traveltime.fillna(0)
     return df
 
 def removeCancelledTrain(df):

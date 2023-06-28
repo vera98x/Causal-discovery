@@ -32,6 +32,7 @@ class PCAndBackground():
             node_x.add_attribute("id", i)
             nodes.append(node_x)
         #----------------------------- Depth0 start
+        # only add the nodes that are not forbiddden in the adjacency list
         print("creating nodes and dependencies...")
         node_length = len(nodes)
         for i, node_x in enumerate(nodes):
@@ -48,6 +49,7 @@ class PCAndBackground():
         # ----------------------------- Depth0 end
 
         # ----------------------------- Depth x start
+        # prune the edges from depth 0 by performing independence tests (but remain the required edges)
         maxDepth = 20
         for depth in range(maxDepth):
             print("Depth: ", depth)
@@ -65,13 +67,16 @@ class PCAndBackground():
                         # if the node_x is required, don't try to find independences and move on to the next edge
                         continue
                     remaining_adjx = copy.copy(adjx)
+                    # remove the other node as possible set to condition on
                     remaining_adjx.pop(index_j)
 
                     cleaned_remaining_adjx = []
                     for adjx_node in remaining_adjx:
+                        # do not add required nodes in the adjacency list This was also done in the causal lib:
+                        # https://github.com/py-why/causal-learn/blob/0.1.3.0/causallearn/utils/Fas.py#L18
                         if not self.bk.is_required(node_x, adjx_node[0]):
                             cleaned_remaining_adjx.append(adjx_node)
-
+                    # create all sets of length dept as possible sepset
                     possible_sepsets = itertools.combinations(cleaned_remaining_adjx, depth)
                     for possible_sepset in possible_sepsets:
                         enough_adjacencies_for_depth = True
@@ -80,6 +85,7 @@ class PCAndBackground():
                         possible_sepset_indexes = [x[1] for x in possible_sepset]
                         p_value = independence_test_method(i, j, possible_sepset_indexes)
                         if (p_value > self.alpha):
+                            # add the possible sepset as sepset for the nodes
                             sepsets[(node_x.get_name(), node_j.get_name())] = [possible_sepset]
                             # remove adjacency x
                             current_adjancencies_x = adjacencies.get(node_x.get_name(), [])
@@ -90,6 +96,7 @@ class PCAndBackground():
                             current_adjancencies_j = adjacencies.get(node_j.get_name(), [])
                             updated_adjacencies_j = [x for x in current_adjancencies_j if x[0] != node_x]
                             adjacencies[node_j.get_name()] = updated_adjacencies_j
+            # if the nodes are already separated by one sepset, do not search further.
             if not enough_adjacencies_for_depth:
                 break
         # ----------------------------- Depth x end
@@ -110,6 +117,7 @@ class PCAndBackground():
     def orientEdges(self, ggFas : GeneralGraph) -> GeneralGraph:
         nodes = ggFas.get_nodes()
         num_vars = len(nodes)
+        # for all nodes, add the tiem attribute, such that it does not need to be retrieved every time
         for node in nodes:
             node_name = node.get_name()
             tro_time = self.id_tro_dict[node_name].getPlannedTime_time()
@@ -127,6 +135,7 @@ class PCAndBackground():
             tro2_time = node2.get_attribute('time')
 
             reverse = False
+            # on the same date, 00h is later than 23h, so then we need to reverse the edges.
             if (tro1_time.hour == 23 or tro2_time.hour == 23) and (tro1_time.hour == 0 or tro2_time.hour == 0):
                 reverse = True
 
@@ -147,10 +156,10 @@ class PCAndBackground():
         return ggFas
 
     def apply_pc_with_background(self, graph_save_png_bool, filename = None) -> GeneralGraph:
-        '''The PC-algorithm is applies
-        first it performs a skeleton search using the self.fas_() fucntion
+        '''The PC-algorithm is applied
+        first, it performs a skeleton search using the self.fas_() function
         then it orients the edges.
-        Per step, the timing is captured and lastly, the graph can be saved as an image'''
+        Per step, the timing is captured and lastly, the graph can be saved as an image if graph_save_png_bool is true'''
         if(graph_save_png_bool == True and filename == None):
             raise ValueError("Filename is not provided, but print_graph_bool is True")
         print("start with FAS with background")

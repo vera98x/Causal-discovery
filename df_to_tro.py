@@ -5,6 +5,12 @@ from typing import List, Dict, Union
 from TrainRideObject import TrainRideObject
 
 def create_dict_TROid_column_index(tro_schedule_list : List[TrainRideObject]) -> Dict[str, int]:
+    '''
+    The goal of this function is to assign per TRO an index where they belong in the column. This way
+    every same event is placed at the same column in the matrix.
+    :param tro_schedule_list:
+    :return Dict[str, int]:
+    '''
     dict = {}
     for tro in tro_schedule_list:
         index = tro.getIndex()
@@ -44,8 +50,12 @@ def dfToTrainRides(df : pd.DataFrame, column_index_dict = None) -> np.array:
     return tro_matrix
 
 def TRO_matrix_to_delay_matrix(tro_matrix : np.array) -> np.array:
-    '''This function translate the np.array filled with TRO to a np.array of ints denoting the delay of each TRO
-    This format is created for data to feed in the causal discovery algorithms'''
+    '''
+    This function translates the np.array filled with TRO to a np.array of ints denoting the delay of each TRO
+    This format is created for data to feed in the causal discovery algorithms
+    :param tro_matrix:
+    :return np.array:
+    '''
     array_with_delays_2d_new = np.zeros((len(tro_matrix), len(tro_matrix[0]))).astype(float)
     for index, day in enumerate(tro_matrix):
         array_with_delays_2d_new[index] = np.array(list(map(lambda x: x.getDelay(), day)))
