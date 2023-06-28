@@ -31,9 +31,9 @@ class DomainKnowledge:
         self.tro_schedule_list = tro_schedule_list
         self.column_names = np.array(list(map(lambda x: x.getSmallerID(), tro_schedule_list)))
         self.station_dict = createStationDict(tro_schedule_list)
-    def makeEverythingForbidden(self, train_serie_day: np.array, bk: FastBackgroundKnowledge) -> FastBackgroundKnowledge:
+    def makeEverythingForbidden(self, bk: FastBackgroundKnowledge) -> FastBackgroundKnowledge:
         '''Makes every node combination marked as forbidden'''
-        train_serie_day_names = [tro.getSmallerID() for tro in train_serie_day]
+        train_serie_day_names = [tro.getSmallerID() for tro in self.tro_schedule_list]
         for tro_index in range(len(train_serie_day_names)):
             tro_name = train_serie_day_names[tro_index]
             if tro_index != len(train_serie_day_names) -1:
@@ -42,14 +42,14 @@ class DomainKnowledge:
                 other_deps = train_serie_day_names[:tro_index]
             bk.addForbiddenDependency_dict(tro_name, other_deps)
         return bk
-    def addRequiredBasedTrainSerie(self, train_serie_day: np.array, bk: FastBackgroundKnowledge) -> FastBackgroundKnowledge:
+    def addRequiredBasedTrainSerie(self, bk: FastBackgroundKnowledge) -> FastBackgroundKnowledge:
         '''Marks the trains with the same train number at consequtive events required'''
         # trainseries contains a 1D array containing TreinRideNode data of one day
         # for each train ride and every stop/station, add a chain of dependencies
         # s1->s2->s3
         prev_name = ""
         prev_trainNumber = ""
-        for tro in train_serie_day:
+        for tro in self.tro_schedule_list:
             # skip first station
             if tro.getTrainRideNumber() != prev_trainNumber:
                 prev_trainNumber = tro.getTrainRideNumber()
@@ -70,7 +70,7 @@ class DomainKnowledge:
                 (time_tro, tro) = station_list[station_index]
                 for station2_index in range(station_index+1, len(station_list)):
                     (other_time_tro, other_tro) = station_list[station2_index]
-                    if (other_time_tro - time_tro).total_seconds() <= (buffer * 60): # TODO: why not return when the time is out of range?
+                    if (other_time_tro - time_tro).total_seconds() <= (buffer * 60):
                         if(self.graph_type == Graph_type.SUPER):
                             bk.addDependency_dict(tro.getSmallerID(), other_tro.getSmallerID())
                         if (self.graph_type == Graph_type.SWITCHES):
@@ -95,9 +95,9 @@ class DomainKnowledge:
         bk = FastBackgroundKnowledge()
         # first add the required edges, then the forbidden edges (forbidden edges checks if some edge was already required, then it does not add a forbidden edge)
         print("Make everything forbidden")
-        bk = self.makeEverythingForbidden(self.tro_schedule_list, bk)
+        bk = self.makeEverythingForbidden(bk)
         print("Required based on train serie")
-        bk = self.addRequiredBasedTrainSerie(self.tro_schedule_list, bk) # TODO: why provide a parameter that is a "self." that is already accessible
+        bk = self.addRequiredBasedTrainSerie(bk)
         print("add required based on stations")
         bk = self.addPossibleBasedStation(bk)
         return bk

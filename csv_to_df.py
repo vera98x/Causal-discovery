@@ -44,9 +44,7 @@ def makeDataUniform(df : pd.DataFrame, sched : pd.DataFrame) ->  pd.DataFrame:
 
         diff = pd.concat([sched, day]).drop_duplicates(subset=['basic_treinnr', 'basic_drp', 'basic_drp_act'],
                                                          keep=False)
-        # if a dataframe differs, print the data of the frame and show difference
         if (len(diff) != 0):
-            #TODO: if length of dataframe is too small remove it anyway?
 
             # remove the extra activities
             # find activities that are not in the schedule
@@ -71,9 +69,8 @@ def makeDataUniform(df : pd.DataFrame, sched : pd.DataFrame) ->  pd.DataFrame:
             # overlap the delays (if there are too many np.nan, the mv_fischer cannot handle it)
             add_extra_activities['basic_uitvoer'] = np.nan
             add_extra_activities['delay'] = np.nan
-            #print(add_extra_activities[["basic_treinnr_treinserie", "basic_drp", "basic_drp_act", "date", "time", "basic_plan"]].to_string())
             add_extra_activities = add_extra_activities.drop(columns=["time"])
-            # Combine the datafrem for the day with the extra activities
+            # Combine the dataframe for the day with the extra activities
             df_r = pd.concat([df_res, add_extra_activities])
             # sort them
             df_r = df_r.sort_values(by=['date', 'basic_treinnr_treinserie', "basic_treinnr", 'basic_plan'])
@@ -108,7 +105,6 @@ def addbufferColumn(df):
     return df
 
 def addTravelTimeColumn(df):
-    # Make sure that all activities are occuring once per location (aka make it D)
     # sort the dataframe
     df = df.sort_values(by=['date', 'basic_treinnr_treinserie', "basic_treinnr", "basic_plan"])
     # take the current plan and the plan of the previous event and substract with buffer
@@ -123,7 +119,7 @@ def addTravelTimeColumn(df):
     return df
 
 def removeCancelledTrain(df):
-    # only keep the non nan values
+    # only keep the not-nan values
     df = df[df['vklvos_plan_actueel'].notna()]
     return df
 
@@ -146,7 +142,7 @@ def removeFacultativeTrains(df, df_sched):
 def retrieveDataframe(export_name : str, workdays : bool, list_of_trainseries: List[str] = None, list_of_drp: List[str] = None) -> Tuple[pd.DataFrame, pd.DataFrame]:
     # split dataframes in column
     df = pd.read_csv(export_name, sep=";")
-    print("len: ", len(df))
+    print("Number of rows: ", len(df))
     df = df[
         ["nvgb_verkeersdatum", 'basic_treinnr_treinserie','basic_treinnr', 'basic_spoor_simpel', 'basic_drp', 'basic_drp_act', 'basic_plan', 'basic_uitvoer', 'vklvos_plan_actueel', "prl_rijw_laatst_rijweg_wisselroute_maxsnelheid", "basic_treinnr_rijkarakter", "vklbammat_soorttype_uitgevoerd", "vklvos_bijzonderheid_drglsnelheid", "donna_bd_kalerijtijd", "stipt_oorzaak_treinr"]]
     # set types of columns
@@ -169,7 +165,6 @@ def retrieveDataframe(export_name : str, workdays : bool, list_of_trainseries: L
     df['delay'] = df['basic_uitvoer'] - df['basic_plan']
     df['delay'] = df['delay'].map(toSeconds)
     # if there is no basic uitvoer or basic plan, give a small random delay such that not everything is 0 or nan
-    #todo: remove this approach
     df['delay'] = df['delay'].apply(lambda v: random.randint(-5, 5) if np.isnan(v) else v)
 
     # rename column
@@ -230,7 +225,7 @@ def retrieveDataframe(export_name : str, workdays : bool, list_of_trainseries: L
         df['speed'] == "baanvak", df['vklvos_bijzonderheid_drglsnelheid'],
         df['speed'])
     df["speed"] = df["speed"].astype('float')
-
+    # sort the values
     df = df.sort_values(by=['date', 'basic_treinnr_treinserie', "basic_treinnr", "basic_plan"])
     df = df.reset_index(drop=True)
 
@@ -242,7 +237,7 @@ def findSched(df):
     df_sched = df_sched.reset_index(drop=True)
     # get the amount of days
     days_count = len(df_sched.groupby('date'))
-    print(days_count)
+    print("Number of days: ", days_count)
     # set threshold for amount of occurences
     min_occ = math.ceil(days_count*0.35)
     g = df_sched.groupby(['basic_treinnr', 'basic_drp', 'basic_drp_act', "global_plan"])

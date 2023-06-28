@@ -35,7 +35,7 @@ class NN_samples:
         self.id_tro = createIDTRODict(sched_with_classes)
         self.input_rows_list : List[NN_input_row]= []
 
-    def convert_graph_to_class(self) -> None:
+    def convert_graph_to_nodes_and_parents_list(self) -> None:
         '''
         For each node in the graph, it finds and classifies its parents and creates a NodeAndParents class, which is added to the nodes_and_parents_list
         :param None:
@@ -176,3 +176,16 @@ class NN_samples:
         df = df.assign(delay = y)
         df.to_csv(filename, index = False, sep = ";")
         return
+
+
+    def graph_to_nn_input(self, tro_matrix : np.array, filename : str) -> None:
+        '''
+        Converts the graph and the tro_matrix to a csv-file that can be used as input for the Neural Network
+        :param tro_matrix:
+        :param filename:
+        :return:
+        '''
+        self.convert_graph_to_nodes_and_parents_list()
+        self.nodes_and_parents_list_to_input_rows_list(tro_matrix)
+        self.input_rows_list_to_df(filename)
+        return None

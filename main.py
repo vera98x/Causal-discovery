@@ -30,20 +30,20 @@ def main_test():
 
     gg_fas = cg_sched.G
     sample_changer = NN_samples(gg_fas, sched_with_classes, df)
-    sample_changer.convert_graph_to_class()
+    sample_changer.convert_graph_to_nodes_and_parents_list()
     sample_changer.nodes_and_parents_list_to_input_rows_list(trn_matrix)
     sample_changer.input_rows_list_to_df("Test14_testsamples/nn_input.csv")
 
     #sample_changer.NN_input_class_to_matrix("Test14_testsamples/nn_input.csv")
 
-def main(calculate_background : bool, path, import_name):
-    print("Phase: dataframe cleaning and to TRO")
+def main(calculate_background : bool, path, dataset_filename):
+    print("Phase: dataframe cleaning and converting to TRO")
     #---------------------------------------------------- start retrieving and cleaning dataframe
     # extract dataframe and impute missing values
-    df, sched = retrieveDataframe(import_name, True)
+    df, sched = retrieveDataframe(dataset_filename, True)
     df.to_csv(path+"/df_done.csv", index=False, sep=";")
     sched.to_csv(path+"/sched_done.csv", index=False, sep=";")
-    print("done clearning df, len df:", len(df))
+    print("done cleaning df, number of rows:", len(df))
     # ---------------------------------------------------- end retrieving and cleaning dataframe
     # ---------------------------------------------------- start translating df to TrainRideObjects
     # create schedule of the Train ride nodes
@@ -78,12 +78,9 @@ def main(calculate_background : bool, path, import_name):
     print("general_graph to nn")
     start = time.time()
     sample_changer = NN_samples(general_graph, tro_schedule_list)
-    sample_changer.convert_graph_to_class() #
-    print("find delays from data")
-    sample_changer.nodes_and_parents_list_to_input_rows_list(tro_matrix)
+    sample_changer.graph_to_nn_input(tro_matrix=tro_matrix, filename=path + "/nn_input.csv")
     end = time.time()
     print("creating new input took", end - start, "seconds")
-    sample_changer.input_rows_list_to_df(path + "/nn_input.csv")
 
 def accuracy_per_group(filename, destination_path, list_to_group_on = None, bucket = False):
     df = pd.read_csv(filename, sep=";")
@@ -231,7 +228,6 @@ def main_nn(train_pre_nn: bool, test_pre_trained_nn: bool, train_precision_nn: b
             act_train = group.act.values
             precisionNN(x_train,y_train,w_train,trainserie_train, drp_train, prev_train, act_train, path+"/Models", str(remaining_df_train.columns), experiment_name2)
 
-        #total_df.to_csv(path + "/merged_files.csv", index=False, sep=";")
 
     if test_precision_bool:
         # then use a second NN for more precision
@@ -257,9 +253,8 @@ def main_nn(train_pre_nn: bool, test_pre_trained_nn: bool, train_precision_nn: b
                 total_df = pd.concat([total_df, new_df])
         total_df.to_csv(path + "/tested_merged_files_" + temp + ".csv", index=False, sep=";")
 
-main(calculate_background = True, path="Tests", import_name = "Data/Rtd-Ddr_short.csv")
 
-# main(calculate_background = True, path="Test50_asd", datasetname = "Data/Asd-Ut.csv" )
+main(calculate_background = True, path="Tests", dataset_filename="Data/Rtd-Ddr.csv")
 # create_train_and_test(path_input="Test50_asd", path_output="Test50_asd")
 # main_nn(train_pre_nn= True, test_pre_trained_nn= False, train_precision_nn=True, test_precision_bool = True, subset_with_only_interaction= False, weights= False, dep_columns= True,
 #        path="Test50_asd", experiment_name1="Ehv_dep_train_buffer_15_min", experiment_name2="Asd_dep_test_buffer_15_min", temp="column_causes")
