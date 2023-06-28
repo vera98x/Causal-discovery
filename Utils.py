@@ -82,6 +82,11 @@ def plotDelay():
     plt.show()
 
 def createIDTRODict(sched_with_classes : np.array) -> Dict[str, TrainRideObject]:
+    '''
+    Creates a dictionary for looking up the tro-schedule using the TRO-id
+    :param sched_with_classes:
+    :return:
+    '''
     result_dict = {}
     for trn in sched_with_classes:
         result_dict[trn.getSmallerID()] = trn
@@ -165,7 +170,13 @@ def compare_distribution_histogram():
 
         plt.show()
 
-def traveltime_tester(path):
+def traveldistance_tester(path):
+    '''
+    This function tests if all the neccesary distances are present within the provided dataset. If this is not provided,
+    the missing connections are printed, such that it is known which need to be included manually in the file. It uses the schedule to test all next stops
+    :param path:
+    :return:
+    '''
     filename = "Data/Dienstregelpuntverbindingen_afstanden.csv"
     df = pd.read_csv(filename, sep=";")
     df = df[["Van", "Naar", "Aantal hectometers"]]
@@ -196,6 +207,11 @@ def saveGraph(inputfile, destination):
     pdy.write_png(destination)
 
 def comparingInteraction(path):
+    '''
+    Compare our found interactions with the interactions found by ProRail
+    :param path:
+    :return:
+    '''
     df_dict = {}
     gg_dict = {}
 
@@ -241,6 +257,14 @@ def print_number_freight(filename):
     print("Percentage: ", 100/len(df)*len(df_freight))
 
 def accuracy_per_group(filename, destination_path, list_to_group_on = None, bucket = False):
+    '''
+    Function is used to estimate the errors per a provided bucket to separate the result set on
+    :param filename:
+    :param destination_path:
+    :param list_to_group_on:
+    :param bucket:
+    :return:
+    '''
     df = pd.read_csv(filename, sep=";")
     if bucket:
         df["bucket"] = df["actual"].apply(lambda x: math.floor(x // 30))

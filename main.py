@@ -5,7 +5,7 @@ from causallearn.utils.TXT2GeneralGraph import txt2generalgraph
 from PC_and_background import PCAndBackground
 from graph_to_nn_input import NN_samples
 from NeuralNetwork import train_pre_trained_nn, train_fine_tuned_nn, test_pre_trained_nn, test_fine_tuned_nn
-from Utils import gg2txt, traveltime_tester, saveGraph, print_number_freight, accuracy_per_group
+from Utils import gg2txt, traveldistance_tester, saveGraph, print_number_freight, accuracy_per_group
 import numpy as np
 import pandas as pd
 import math
