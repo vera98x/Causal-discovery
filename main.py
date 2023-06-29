@@ -8,33 +8,7 @@ from NeuralNetwork import train_pre_trained_nn, train_fine_tuned_nn, test_pre_tr
 from Utils import gg2txt, traveldistance_tester, saveGraph, print_number_freight, accuracy_per_group
 import numpy as np
 import pandas as pd
-import math
 import time
-
-
-def main_test():
-    df, sched = retrieveDataframe("Test14_testsamples/df_test_speed_slack_cause.csv", True)
-    df.to_csv("Test14_testsamples/df_done.csv", index=False, sep=";")
-    sched.to_csv("Test14_testsamples/sched_done.csv", index=False, sep=";")
-    trn_matrix = dfToTrainRides(df)
-    # # translate the TrainRideNodes to delays
-    delay_matrix = TRO_matrix_to_delay_matrix(trn_matrix)
-
-    sched_with_classes = dfToTrainRides(sched)[0]
-    print("Amount of variables: ", len(trn_matrix[0]))
-    column_names = np.array(list(map(lambda x: x.getSmallerID(), sched_with_classes)))
-
-    # create a background and its schedule (background for Pc or FCI, cg_sched for GES)
-    dk = DomainKnowledge(delay_matrix, 'Test14_testsamples/sched.png', Graph_type.SWITCHES)
-    bk, cg_sched = dk.create_background_knowledge_with_timing()  # get_CG_and_background(smaller_dataset, 'Results/sched.png')
-
-    gg_fas = cg_sched.G
-    sample_changer = NN_samples(gg_fas, sched_with_classes, df)
-    sample_changer.convert_graph_to_nodes_and_parents_list()
-    sample_changer.nodes_and_parents_list_to_input_rows_list(trn_matrix)
-    sample_changer.input_rows_list_to_df("Test14_testsamples/nn_input.csv")
-
-    #sample_changer.NN_input_class_to_matrix("Test14_testsamples/nn_input.csv")
 
 def create_nn_input_from_df(calculate_background : bool, path, dataset_filename):
     print("Phase: dataframe cleaning and converting to TRO")
