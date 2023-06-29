@@ -99,7 +99,7 @@ def create_train_and_test(path_input, path_output):
     train_set.to_csv(path_output + "/nn_input_train.csv", index=False, sep=";")
     test_set.to_csv(path_output + "/nn_input_test.csv", index=False, sep=";")
 
-def preprocess_df_nn(df, weights, subset_with_only_interaction, dep_columns):
+def preprocess_df_nn(df, weights, subset_with_only_interaction):
     # if the prev event traveltime or the delay is not known, remove it from the dataframe
     df = df.dropna(subset=['delay'])
     df = df.dropna(subset=['prev_event'])
@@ -120,20 +120,15 @@ def preprocess_df_nn(df, weights, subset_with_only_interaction, dep_columns):
     print("After: ", len(df))
     # fill the empty values with -50
     df = df.fillna(-50)
-    # add all columns except id and delay as input
-    if (not dep_columns):
-        df = df[df.columns.drop(list(df.filter(regex='dep')))]
-        df = df[df.columns.drop(list(df.filter(regex='timeinterval_')))]
-        df = df[df.columns.drop(list(df.filter(regex='prev_platform')))]
     return df
 
-def train_or_test_nn(train_pre_trained_nn_bool: bool, test_pre_trained_nn_bool: bool, train_fine_tuned_nn_bool: bool, test_fine_tuned_nn_bool :bool, subset_with_only_interaction: bool, weights :bool, dep_columns : bool, path, experiment_name1 ='default', experiment_name2 ='default', additional_file_name =""):
+def train_or_test_nn(train_pre_trained_nn_bool: bool, test_pre_trained_nn_bool: bool, train_fine_tuned_nn_bool: bool, test_fine_tuned_nn_bool :bool, subset_with_only_interaction: bool, weights :bool, path, experiment_name1 ='default', experiment_name2 ='default', additional_file_name =""):
     # the filenames should be nn_imput_train and nn_input_test, to have a clear distinguishment between both sets.
     df_train = pd.read_csv(path+'/nn_input_train.csv', sep = ";")
     df_test = pd.read_csv(path + '/nn_input_test.csv', sep=";")
     print("train: ", len(df_train), "test: ", len(df_test))
-    df_train = preprocess_df_nn(df_train, weights, subset_with_only_interaction, dep_columns)
-    df_test = preprocess_df_nn(df_test, weights, subset_with_only_interaction, dep_columns)
+    df_train = preprocess_df_nn(df_train, weights, subset_with_only_interaction)
+    df_test = preprocess_df_nn(df_test, weights, subset_with_only_interaction)
 
     remaining_df_train = df_train[df_train.columns[~df_train.columns.isin(["id", 'delay', "trainserie", "drp", "act", "weight", "cause", "index_total"])]]
     remaining_df_test= df_test[df_test.columns[~df_test.columns.isin(["id", 'delay', "trainserie", "drp", "act", "weight", "cause", "index_total"])]]
@@ -197,8 +192,15 @@ def train_or_test_nn(train_pre_trained_nn_bool: bool, test_pre_trained_nn_bool: 
                 total_df = pd.concat([total_df, new_df])
         total_df.to_csv(path + "/tested_merged_files_" + additional_file_name + ".csv", index=False, sep=";")
 
+def main(calculate_background_bool : bool, path : str, dataset_filename : str, path_input : str, path_output: str,
+         train_pre_trained_nn_bool, test_pre_trained_nn_bool, train_fine_tuned_nn_bool, test_fine_tuned_nn_bool,
+         subset_with_only_interaction, weights, experiment_name1, experiment_name2, additional_file_name = ""):
+    create_nn_input_from_df(calculate_background = calculate_background_bool, path=path, dataset_filename=dataset_filename)
+    create_train_and_test(path_input=path_input, path_output=path_output)
+    train_or_test_nn(train_pre_trained_nn_bool= train_pre_trained_nn_bool, test_pre_trained_nn_bool= test_pre_trained_nn_bool, train_fine_tuned_nn_bool=train_fine_tuned_nn_bool,
+                     test_fine_tuned_nn_bool = test_fine_tuned_nn_bool, subset_with_only_interaction= subset_with_only_interaction, weights= weights,
+                    path=path_output, experiment_name1=experiment_name1, experiment_name2=experiment_name2, additional_file_name=additional_file_name)
 
-create_nn_input_from_df(calculate_background = True, path="Tests", dataset_filename="Data/Rtd-Ddr.csv")
-# create_train_and_test(path_input="Test50_asd", path_output="Test50_asd")
-# main_nn(train_pre_nn= True, test_pre_trained_nn= False, train_precision_nn=True, test_precision_bool = True, subset_with_only_interaction= False, weights= False, dep_columns= True,
-#        path="Test50_asd", experiment_name1="Ehv_dep_train_buffer_15_min", experiment_name2="Asd_dep_test_buffer_15_min", temp="column_causes")
+main(calculate_background_bool = True, path="Tests", dataset_filename="Data/Rtd-Ddr.csv", path_input="Tests", path_output="Tests",
+     train_pre_trained_nn_bool =True, test_pre_trained_nn_bool=False, train_fine_tuned_nn_bool=True, test_fine_tuned_nn_bool=True,
+     subset_with_only_interaction = True, weights=False, experiment_name1="Train_rtd_pre_trained", experiment_name2="Train_rtd_fine_tuned")
